@@ -250,6 +250,9 @@
 
             const [profileModalOpen, setProfileModalOpen] = useState(false);
             const [selectedProfile, setSelectedProfile] = useState(null);
+            const [groupOnlyMode, setGroupOnlyMode] = useState(false);
+            const [multiPaymentModalOpen, setMultiPaymentModalOpen] = useState(false);
+            const [selectedMonthPayments, setSelectedMonthPayments] = useState([]);
 
             const fileInputRef = useRef(null);
             const [uploading, setUploading] = useState(false);
@@ -341,6 +344,7 @@
             const handleAddSingle = () => {
                 const tempId = 'NEW_' + Date.now();
                 setSelectedFamilyStudent({ id: tempId, name: '', studentClass: '+2', gender: 'M', guardian: '', phone: '', groupId: tempId, pendingArrears: 0, groupFee: null, payments: {}, extraFeePayments: {}, profile: {}, isNew: true });
+                setGroupOnlyMode(false);
                 setFamilyModalOpen(true);
             };
 
@@ -354,6 +358,50 @@
             const openExtraFeeModal = (student) => {
                 setExtraFeeStudentData(student);
                 setExtraFeeModalOpen(true);
+            };
+
+            const paymentKey = (groupId, month) => `${groupId}_${month}`;
+            const isMonthSelected = (groupId, month) => selectedMonthPayments.some(item => item.key === paymentKey(groupId, month));
+            const toggleMonthSelection = (e, groupMembers, month, groupFee) => {
+                e.stopPropagation();
+                const key = paymentKey(groupMembers[0]?.groupId, month);
+                setSelectedMonthPayments(prev => prev.some(item => item.key === key) ? prev.filter(item => item.key !== key) : [...prev, { key, groupId: groupMembers[0]?.groupId, members: groupMembers, month, groupFee }]);
+            };
+            const openMultiEntry = () => {
+                if (!selectedMonthPayments.length) return;
+                setMultiPaymentModalOpen(true);
+            };
+            const clearMultiSelection = () => setSelectedMonthPayments([]);
+            const openFullStudentEditor = (student) => {
+                setProfileModalOpen(false);
+                setSelectedFamilyStudent(student);
+                setGroupOnlyMode(false);
+                setFamilyModalOpen(true);
+            };
+            const renderMonthCells = (student, groupMembers) => {
+                const cells = [];
+                let i = 0;
+                while (i < dynamicMonths.length) {
+                    const month = dynamicMonths[i];
+                    const payment = student.payments?.[month];
+                    if (payment?.batchId) {
+                        const batchMonths = [];
+                        let j = i;
+                        while (j < dynamicMonths.length && student.payments?.[dynamicMonths[j]]?.batchId === payment.batchId) { batchMonths.push(dynamicMonths[j]); j++; }
+                        if (batchMonths.length > 1) {
+                            const totalPaid = batchMonths.reduce((sum, m) => sum + parseInt(student.payments?.[m]?.amount || 0), 0);
+                            const totalBal = batchMonths.reduce((sum, m) => sum + parseInt(student.payments?.[m]?.arrearsAdded || 0), 0);
+                            cells.push(<td key={payment.batchId} colSpan={batchMonths.length} className="px-1.5 py-1 border-r cursor-pointer bg-green-50 hover:bg-green-100 min-w-[140px]" onClick={() => openPaymentModal(groupMembers, month)}><div className="rounded-lg border border-green-300 bg-green-100 p-2 text-[10px] leading-tight whitespace-normal shadow-sm text-green-900"><div className="font-black text-center text-[11px] mb-1">✓ {batchMonths.join(', ')}</div><div className="font-bold">Date: {payment.date || '-'}</div><div className="font-bold">Rec: {payment.receipt || 'N/A'}</div><div>Paid Total: ₹{totalPaid}</div>{totalBal > 0 && <div className="text-red-700 font-black">Balance: ₹{totalBal}</div>}</div></td>);
+                            i = j;
+                            continue;
+                        }
+                    }
+                    const groupFee = groupMembers[0]?.groupFee || (groupMembers.length * settings.globalBaseFee);
+                    const balance = payment?.arrearsAdded || 0;
+                    cells.push(<td key={month} className={`px-1.5 py-1 border-r cursor-pointer transition-colors min-w-[110px] ${payment ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-red-50'}`} onClick={() => openPaymentModal(groupMembers, month)}><div className="relative"><input type="checkbox" checked={isMonthSelected(groupMembers[0]?.groupId, month)} onChange={(e) => toggleMonthSelection(e, groupMembers, month, groupFee)} onClick={(e) => e.stopPropagation()} className="absolute -top-0.5 -left-0.5 w-3 h-3 accent-green-700" />{!payment ? <div className="min-h-[52px] flex flex-col items-center justify-center text-red-600 pt-2"><span className="w-6 h-6 rounded-full bg-red-100 border border-red-300 flex items-center justify-center text-[10px] font-black">!</span><span className="text-[10px] font-bold mt-1">Not Paid</span></div> : <div className={`rounded-lg border p-1.5 text-[10px] leading-tight whitespace-normal shadow-sm ${payment.status === 'FULL' ? 'bg-green-100 border-green-300 text-green-900' : 'bg-yellow-50 border-yellow-300 text-yellow-900'}`}><div className="flex items-center justify-center gap-1 font-black text-[11px] mb-1">{payment.status === 'FULL' ? <span className="text-green-700">✓ Paid</span> : <span className="text-yellow-800">Partial</span>}</div><div className="font-bold">Date: {payment.date || '-'}</div><div className="font-bold">Rec: {payment.receipt || 'N/A'}</div><div>Paid: ₹{payment.amount || 0}</div>{balance > 0 && <div className="text-red-700 font-black">Bal: ₹{balance}</div>}</div>}</div></td>);
+                    i++;
+                }
+                return cells;
             };
 
             return (
@@ -397,6 +445,14 @@
                             <button onClick={handleAddSingle} className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded font-medium text-sm transition-colors shadow-sm">+ Add Student</button>
                         </div>
                     </div>
+
+
+                    {selectedMonthPayments.length > 0 && (
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-green-50 border border-green-200 rounded-lg p-3 shadow-sm">
+                            <div className="text-sm text-green-900 font-bold">{selectedMonthPayments.length} fee item(s) selected • Total: ₹{selectedMonthPayments.reduce((sum, item) => sum + parseInt(item.groupFee || 0), 0)}</div>
+                            <div className="flex gap-2"><button onClick={clearMultiSelection} className="px-3 py-1.5 rounded border border-green-300 bg-white text-green-800 font-bold text-sm">Clear</button><button onClick={openMultiEntry} className="px-4 py-1.5 rounded bg-green-700 text-white font-bold text-sm shadow">Entry</button></div>
+                        </div>
+                    )}
 
                     {/* Data Table */}
                     <div className="table-container border rounded-lg shadow-sm bg-white">
@@ -451,7 +507,7 @@
                                                 </td>
                                                 
                                                 <td className="px-2 py-2 border-r text-center bg-yellow-50/20">
-                                                    <button onClick={() => { setSelectedFamilyStudent(student); setFamilyModalOpen(true); }} className={`w-full flex items-center justify-center px-1 py-1 bg-white border rounded font-bold shadow-sm transition-all text-[11px] tracking-wide ${hasConcession ? 'border-yellow-400 text-yellow-900 bg-yellow-50' : 'border-gray-200 text-gray-700 hover:border-yellow-300'}`}>
+                                                    <button onClick={() => { setSelectedFamilyStudent(student); setGroupOnlyMode(true); setFamilyModalOpen(true); }} className={`w-full flex items-center justify-center px-1 py-1 bg-white border rounded font-bold shadow-sm transition-all text-[11px] tracking-wide ${hasConcession ? 'border-yellow-400 text-yellow-900 bg-yellow-50' : 'border-gray-200 text-gray-700 hover:border-yellow-300'}`}>
                                                         {isGroup && <Icons.Link />} ₹{actualFee} {isGroup ? `(${groupMembers.length})` : ''}
                                                     </button>
                                                 </td>
@@ -467,30 +523,7 @@
                                                 </td>
 
                                                 {/* Dynamic month columns with visible payment details */}
-                                                {dynamicMonths.map(month => {
-                                                    const payment = student.payments?.[month];
-                                                    const balance = payment?.arrearsAdded || 0;
-                                                    return (
-                                                        <td key={month} className={`px-1.5 py-1 border-r cursor-pointer transition-colors min-w-[110px] ${payment ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-red-50'}`} onClick={() => openPaymentModal(groupMembers, month)}>
-                                                            {!payment ? (
-                                                                <div className="min-h-[52px] flex flex-col items-center justify-center text-red-600">
-                                                                    <span className="w-6 h-6 rounded-full bg-red-100 border border-red-300 flex items-center justify-center text-[10px] font-black">!</span>
-                                                                    <span className="text-[10px] font-bold mt-1">Not Paid</span>
-                                                                </div>
-                                                            ) : (
-                                                                <div className={`rounded-lg border p-1.5 text-[10px] leading-tight whitespace-normal shadow-sm ${payment.status === 'FULL' ? 'bg-green-100 border-green-300 text-green-900' : 'bg-yellow-50 border-yellow-300 text-yellow-900'}`}>
-                                                                    <div className="flex items-center justify-center gap-1 font-black text-[11px] mb-1">
-                                                                        {payment.status === 'FULL' ? <span className="text-green-700">✓ Paid</span> : <span className="text-yellow-800">Partial</span>}
-                                                                    </div>
-                                                                    <div className="font-bold">Date: {payment.date || '-'}</div>
-                                                                    <div className="font-bold">Rec: {payment.receipt || 'N/A'}</div>
-                                                                    <div>Paid: ₹{payment.amount || 0}</div>
-                                                                    {balance > 0 && <div className="text-red-700 font-black">Bal: ₹{balance}</div>}
-                                                                </div>
-                                                            )}
-                                                        </td>
-                                                    );
-                                                })}
+                                                {renderMonthCells(student, groupMembers)}
                                             </tr>
                                         );
                                     })
@@ -511,16 +544,17 @@
                         </div>
                     )}
 
-                    {familyModalOpen && <FamilySetupModal primaryStudent={selectedFamilyStudent} allStudents={students} globalBaseFee={settings.globalBaseFee} onClose={() => setFamilyModalOpen(false)} showAlert={showAlert}/>}
+                    {familyModalOpen && <FamilySetupModal primaryStudent={selectedFamilyStudent} allStudents={students} globalBaseFee={settings.globalBaseFee} groupOnly={groupOnlyMode} onClose={() => setFamilyModalOpen(false)} showAlert={showAlert}/>}
                     {paymentModalOpen && <GroupPaymentModal context={paymentGroupData} onClose={() => setPaymentModalOpen(false)} showAlert={showAlert}/>}
+                    {multiPaymentModalOpen && <MultiPaymentModal selectedItems={selectedMonthPayments} onClose={() => setMultiPaymentModalOpen(false)} onSaved={() => { setMultiPaymentModalOpen(false); clearMultiSelection(); }} showAlert={showAlert}/>}
                     {extraFeeModalOpen && <ExtraFeeModal student={extraFeeStudentData} settings={settings} onClose={() => setExtraFeeModalOpen(false)} showAlert={showAlert}/>}
-                    {profileModalOpen && <StudentProfileModal student={selectedProfile} onClose={() => setProfileModalOpen(false)} />}
+                    {profileModalOpen && <StudentProfileModal student={selectedProfile} onClose={() => setProfileModalOpen(false)} onEdit={() => openFullStudentEditor(selectedProfile)} showAlert={showAlert} />}
                 </div>
             );
         };
 
         // --- STUDENT PROFILE MODAL ---
-        const StudentProfileModal = ({ student, onClose }) => {
+        const StudentProfileModal = ({ student, onClose, onEdit, showAlert }) => {
             if (!student) return null;
             const prof = student.profile || {};
             
@@ -552,8 +586,9 @@
                                 <div className="col-span-2"><span className="block text-gray-500 font-medium text-xs">Samastha ID</span><span className="font-bold text-gray-800">{prof.samasthaId || '-'}</span></div>
                             </div>
                         </div>
-                        <div className="bg-gray-50 px-6 py-4 border-t flex justify-end">
-                            <button onClick={onClose} className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-md font-bold">Close</button>
+                        <div className="bg-gray-50 px-6 py-4 border-t flex justify-between items-center">
+                            <button onClick={async () => { if (confirm('Delete this student record permanently?')) { await db.collection('students').doc(student.id).delete(); onClose(); showAlert('Student deleted successfully.', 'Deleted'); } }} className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-md font-bold">Delete</button>
+                            <div className="space-x-2"><button onClick={onClose} className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-md font-bold">Cancel</button><button onClick={onEdit} className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-bold shadow">Edit</button></div>
                         </div>
                     </div>
                 </div>
@@ -561,7 +596,7 @@
         };
 
         // --- EXPANDED FAMILY / GROUP SETUP MODAL ---
-        const FamilySetupModal = ({ primaryStudent, allStudents, globalBaseFee, onClose, showAlert }) => {
+        const FamilySetupModal = ({ primaryStudent, allStudents, globalBaseFee, groupOnly = false, onClose, showAlert }) => {
             const [members, setMembers] = useState([]);
             const [searchClass, setSearchClass] = useState('');
             const [searchName, setSearchName] = useState('');
@@ -586,7 +621,7 @@
             const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
             useEffect(() => {
-                const grp = allStudents.filter(s => s.groupId === primaryStudent.groupId);
+                const grp = primaryStudent.isNew ? [primaryStudent] : allStudents.filter(s => s.groupId === primaryStudent.groupId);
                 setMembers(grp);
                 setGroupFee(grp[0]?.groupFee || ''); setGuardian(grp[0]?.guardian || '');
                 setPhone(grp[0]?.phone || ''); setPendingArrears(grp[0]?.pendingArrears || 0);
@@ -630,7 +665,7 @@
 
             const handleSave = async (e) => {
                 e.preventDefault();
-                if (!stName.trim()) return showAlert('Student name is required before saving.', 'Missing Info');
+                if (!groupOnly && !stName.trim()) return showAlert('Student name is required before saving.', 'Missing Info');
                 const batch = db.batch();
                 const finalFee = groupFee ? parseInt(groupFee) : null;
                 const finalArrears = parseInt(pendingArrears || 0);
@@ -641,7 +676,9 @@
                     name: stName.toUpperCase(), studentClass: stClass, gender: stGender,
                     profile: { dob: stDob, address: stAddress, adhaar: stAdhaar, admNo: stAdmNo, admDate: stAdmDate, samasthaId: stSamasthaId }, payments: primaryStudent.payments || {}, extraFeePayments: primaryStudent.extraFeePayments || {}
                 };
-                primaryStudent.isNew ? batch.set(primaryRef, { ...primaryPayload, groupId: primaryRef.id, guardian: guardian.toUpperCase(), phone: phone, groupFee: finalFee, pendingArrears: finalArrears }) : batch.update(primaryRef, primaryPayload);
+                if (!groupOnly) {
+                    primaryStudent.isNew ? batch.set(primaryRef, { ...primaryPayload, groupId: primaryRef.id, guardian: guardian.toUpperCase(), phone: phone, groupFee: finalFee, pendingArrears: finalArrears }) : batch.update(primaryRef, primaryPayload);
+                }
 
                 members.filter(m => !m.isNew).forEach(m => {
                     const docRef = db.collection('students').doc(m.id);
@@ -679,12 +716,12 @@
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-2 sm:p-4">
                     <div className="bg-gray-100 rounded-lg shadow-2xl max-w-5xl w-full flex flex-col h-[95vh] md:h-[90vh]">
                         <div className="bg-yellow-600 px-6 py-4 flex justify-between items-center text-white shrink-0 shadow-sm z-10">
-                            <h3 className="text-lg font-bold flex items-center"><Icons.Link /> Add / Edit Student & Setup Family</h3>
+                            <h3 className="text-lg font-bold flex items-center"><Icons.Link /> {groupOnly ? 'Group Setup & Concession' : 'Add / Edit Student Details'}</h3>
                             <button onClick={onClose} className="hover:text-gray-200"><Icons.Close /></button>
                         </div>
                         
                         <div className="flex-1 overflow-y-auto p-4 flex flex-col lg:flex-row gap-4">
-                            <div className="flex-1 lg:w-3/5 space-y-4">
+                            {!groupOnly && <div className="flex-1 lg:w-3/5 space-y-4">
                                 <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-200">
                                     <h4 className="font-bold text-gray-800 mb-4 border-b pb-2">1. Student Profile Details</h4>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -702,9 +739,9 @@
                                         <div className="sm:col-span-2"><label className="text-xs font-bold text-gray-500 mb-1 block">Samastha Online ID</label><input type="text" className="w-full p-2 border rounded outline-none" value={stSamasthaId} onChange={e => setStSamasthaId(e.target.value)} /></div>
                                     </div>
                                 </div>
-                            </div>
+                            </div>}
 
-                            <div className="flex-1 lg:w-2/5 flex flex-col space-y-4">
+                            <div className={`flex-1 ${groupOnly ? 'lg:w-full max-w-3xl mx-auto' : 'lg:w-2/5'} flex flex-col space-y-4`}>
                                 <div className="bg-white p-5 rounded-lg shadow-sm border border-yellow-300">
                                     <h4 className="font-bold text-yellow-800 mb-4 border-b border-yellow-200 pb-2">2. Shared Family Setup (Finance)</h4>
                                     <div className="space-y-4">
@@ -759,10 +796,10 @@
                         </div>
 
                         <div className="bg-white px-6 py-4 border-t flex justify-between items-center shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] rounded-b-lg">
-                            {!primaryStudent.isNew ? <button type="button" onClick={() => setConfirmDeleteOpen(true)} className="text-red-600 font-bold text-sm hover:underline">Delete Record</button> : <span></span>}
+                            {!primaryStudent.isNew && !groupOnly ? <button type="button" onClick={() => setConfirmDeleteOpen(true)} className="text-red-600 font-bold text-sm hover:underline">Delete Record</button> : <span></span>}
                             <div className="space-x-3">
                                 <button type="button" onClick={onClose} className="px-5 py-2.5 border border-gray-300 rounded-md hover:bg-gray-50 font-bold text-gray-700 transition-colors">Cancel</button>
-                                <button type="button" onClick={handleSave} className="px-8 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-yellow-950 rounded-md font-extrabold shadow-md transition-colors">Save All Details</button>
+                                <button type="button" onClick={handleSave} className="px-8 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-yellow-950 rounded-md font-extrabold shadow-md transition-colors">{groupOnly ? 'Save Group Setup' : 'Save All Details'}</button>
                             </div>
                         </div>
                     </div>
@@ -781,6 +818,77 @@
                         message="Permanently delete this student record? All payment history will be lost. This cannot be undone." 
                         confirmText="Yes, Delete" onConfirm={executeDelete} onCancel={() => setConfirmDeleteOpen(false)} 
                     />
+                </div>
+            );
+        };
+
+        // --- MULTI MONTH PAYMENT MODAL ---
+        const MultiPaymentModal = ({ selectedItems, onClose, onSaved, showAlert }) => {
+            const [receipt, setReceipt] = useState('');
+            const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
+            const [amount, setAmount] = useState(selectedItems.reduce((sum, item) => sum + parseInt(item.groupFee || 0), 0));
+            const totalDue = selectedItems.reduce((sum, item) => sum + parseInt(item.groupFee || 0), 0);
+            const grouped = selectedItems.reduce((acc, item) => {
+                const name = item.members.map(m => m.name).join(', ');
+                acc.push({ ...item, studentNames: name });
+                return acc;
+            }, []);
+
+            const handleSave = async (e) => {
+                e.preventDefault();
+                const paidAmount = parseInt(amount);
+                if (!receipt.trim()) return showAlert('Receipt number is required for multi-entry payment.', 'Missing Receipt');
+                if (isNaN(paidAmount) || paidAmount <= 0) return showAlert('Valid amount is required.', 'Invalid Amount');
+                const batchId = 'BATCH_' + Date.now();
+                let remaining = paidAmount;
+                const batch = db.batch();
+
+                selectedItems.forEach(item => {
+                    const due = parseInt(item.groupFee || 0);
+                    const applied = Math.max(0, Math.min(remaining, due));
+                    remaining -= applied;
+                    const arrearsAdded = Math.max(0, due - applied);
+                    const paymentData = {
+                        amount: applied,
+                        status: arrearsAdded > 0 ? 'PARTIAL' : 'FULL',
+                        receipt: receipt.trim().toUpperCase(),
+                        date: payDate,
+                        timestamp: new Date().toISOString(),
+                        arrearsAdded,
+                        batchId,
+                        batchTotal: paidAmount,
+                        batchMonths: selectedItems.map(i => i.month),
+                        isSharedFamilyPayment: item.members.length > 1,
+                        groupId: item.groupId
+                    };
+                    item.members.forEach(m => {
+                        batch.update(db.collection('students').doc(m.id), {
+                            [`payments.${item.month}`]: paymentData,
+                            pendingArrears: firebase.firestore.FieldValue.increment(arrearsAdded)
+                        });
+                    });
+                });
+                await batch.commit();
+                onSaved();
+            };
+
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[85] p-4">
+                    <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden">
+                        <div className="bg-green-700 px-6 py-4 flex justify-between items-center text-white"><h3 className="text-lg font-bold">Selected Fee Entry</h3><button onClick={onClose}><Icons.Close /></button></div>
+                        <form onSubmit={handleSave} className="p-6 space-y-4">
+                            <div className="border rounded-lg overflow-hidden max-h-56 overflow-y-auto">
+                                <table className="w-full text-sm"><thead className="bg-gray-100 text-xs uppercase"><tr><th className="p-2 text-left">Student / Group</th><th className="p-2">Month</th><th className="p-2 text-right">Due</th></tr></thead><tbody>{grouped.map(item => <tr key={item.key} className="border-t"><td className="p-2 font-bold text-gray-800">{item.studentNames}</td><td className="p-2 text-center font-bold">{item.month}</td><td className="p-2 text-right font-black">₹{item.groupFee}</td></tr>)}</tbody></table>
+                            </div>
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex justify-between font-black text-green-900"><span>Total Selected</span><span>₹{totalDue}</span></div>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div><label className="block text-xs font-bold text-gray-500 mb-1">Date</label><input type="date" required className="w-full border rounded p-2 font-bold" value={payDate} onChange={e => setPayDate(e.target.value)} /></div>
+                                <div><label className="block text-xs font-bold text-gray-500 mb-1">Receipt No</label><input type="text" required className="w-full border rounded p-2 font-bold uppercase" value={receipt} onChange={e => setReceipt(e.target.value)} /></div>
+                                <div><label className="block text-xs font-bold text-gray-500 mb-1">Amount Paid</label><input type="number" required min="1" className="w-full border rounded p-2 font-black" value={amount} onChange={e => setAmount(e.target.value)} /></div>
+                            </div>
+                            <div className="flex justify-end gap-2 pt-3 border-t"><button type="button" onClick={onClose} className="px-4 py-2 border rounded font-bold">Cancel</button><button type="submit" className="px-6 py-2 bg-green-700 text-white rounded font-bold shadow">Save Entry</button></div>
+                        </form>
+                    </div>
                 </div>
             );
         };
