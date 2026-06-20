@@ -58,6 +58,8 @@
 
         // Icons Component
         const Icons = {
+            Menu: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>,
+            Dashboard: () => <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 13h8V3H3v10zm10 8h8V3h-8v18zM3 21h8v-6H3v6z"></path></svg>,
             Search: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>,
             Trash: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>,
             Check: () => <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>,
@@ -109,12 +111,17 @@
 
         // Main App Component
         const App = () => {
-            const [activeTab, setActiveTab] = useState('STUDENTS');
+            const [activeTab, setActiveTab] = useState('DASHBOARD');
+            const [menuOpen, setMenuOpen] = useState(false);
             const [students, setStudents] = useState([]);
             const [settings, setSettings] = useState({ 
                 globalBaseFee: 500, 
                 academicStartMonth: 'Jun', 
                 academicEndMonth: 'May',
+                institutionName: 'Madrasa Fee Manager',
+                institutionPlace: '',
+                registerNumber: '',
+                logo: '',
                 extraFees: [] 
             });
             const [loading, setLoading] = useState(true);
@@ -131,10 +138,14 @@
                             globalBaseFee: doc.data().globalBaseFee || 500,
                             academicStartMonth: doc.data().academicStartMonth || 'Jun',
                             academicEndMonth: doc.data().academicEndMonth || 'May',
+                            institutionName: doc.data().institutionName || 'Madrasa Fee Manager',
+                            institutionPlace: doc.data().institutionPlace || '',
+                            registerNumber: doc.data().registerNumber || '',
+                            logo: doc.data().logo || '',
                             extraFees: doc.data().extraFees || []
                         });
                     } else {
-                        db.collection('settings').doc('global').set({ globalBaseFee: 500, academicStartMonth: 'Jun', academicEndMonth: 'May', extraFees: [] });
+                        db.collection('settings').doc('global').set({ globalBaseFee: 500, academicStartMonth: 'Jun', academicEndMonth: 'May', institutionName: 'Madrasa Fee Manager', institutionPlace: '', registerNumber: '', logo: '', extraFees: [] });
                     }
                 }, err => setError("Database Rules Error."));
 
@@ -163,25 +174,55 @@
 
             return (
                 <div className="min-h-screen flex flex-col bg-gray-50">
-                    <header className="bg-green-700 text-white shadow-md">
+                    <header className="bg-green-700 text-white shadow-md relative">
                         <div className="max-w-full px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-                            <h1 className="text-2xl font-bold">Madrasa Fee Manager</h1>
+                            <div className="flex items-center gap-3">
+                                {settings.logo ? <img src={settings.logo} className="w-12 h-12 rounded-full bg-white object-cover border-2 border-white" /> : <div className="w-12 h-12 rounded-full bg-green-900 flex items-center justify-center font-black">MF</div>}
+                                <div><h1 className="text-2xl font-bold">{settings.institutionName || 'Madrasa Fee Manager'}</h1><p className="text-xs text-green-100">{settings.institutionPlace || 'Fee Management System'} {settings.registerNumber ? `• Reg: ${settings.registerNumber}` : ''}</p></div>
+                            </div>
+                            <button onClick={() => setMenuOpen(!menuOpen)} className="p-2 rounded-lg bg-green-800 hover:bg-green-900"><Icons.Menu /></button>
                         </div>
-                        <div className="flex px-4 sm:px-6 lg:px-8 bg-green-800">
-                            <button onClick={() => setActiveTab('STUDENTS')} className={`flex items-center px-6 py-3 font-medium transition-colors ${activeTab === 'STUDENTS' ? 'bg-white text-green-800 rounded-t-lg' : 'text-green-100 hover:text-white'}`}><Icons.Users /> Student Management</button>
-                            <button onClick={() => setActiveTab('SETTINGS')} className={`flex items-center px-6 py-3 font-medium transition-colors ${activeTab === 'SETTINGS' ? 'bg-white text-green-800 rounded-t-lg' : 'text-green-100 hover:text-white'}`}><Icons.Settings /> Settings</button>
-                        </div>
+                        {menuOpen && <div className="absolute right-4 top-20 z-50 w-72 rounded-xl bg-white text-gray-800 shadow-2xl border overflow-hidden">
+                            {[['DASHBOARD','Dashboard',<Icons.Dashboard />],['STUDENTS','Student Management',<Icons.Users />],['SETTINGS','Settings',<Icons.Settings />]].map(([key,label,icon]) => <button key={key} onClick={() => { setActiveTab(key); setMenuOpen(false); }} className={`w-full flex items-center px-5 py-4 font-bold hover:bg-green-50 ${activeTab === key ? 'bg-green-100 text-green-800' : ''}`}>{icon}{label}</button>)}
+                        </div>}
                     </header>
                     <main className="flex-1 max-w-full w-full mx-auto p-4 sm:p-6 lg:p-8 bg-white shadow-inner">
-                        {activeTab === 'STUDENTS' ? 
-                            <StudentTab students={students} settings={settings} dynamicMonths={dynamicMonths} showAlert={showAlert} /> : 
-                            <SettingsTab settings={settings} ALL_MONTHS_BASE={ALL_MONTHS_BASE} showAlert={showAlert} />
-                        }
+                        {activeTab === 'DASHBOARD' && <DashboardTab students={students} settings={settings} dynamicMonths={dynamicMonths} />}
+                        {activeTab === 'STUDENTS' && <StudentTab students={students} settings={settings} dynamicMonths={dynamicMonths} showAlert={showAlert} />}
+                        {activeTab === 'SETTINGS' && <SettingsTab settings={settings} ALL_MONTHS_BASE={ALL_MONTHS_BASE} showAlert={showAlert} />}
                     </main>
 
                     <CustomAlert isOpen={alertState.isOpen} title={alertState.title} message={alertState.message} onClose={() => setAlertState({ isOpen: false, title: '', message: '' })} />
                 </div>
             );
+        };
+
+        const feeAmountForStudent = (fee, studentClass) => {
+            if (!fee) return 0;
+            if (fee.mode === 'MULTI') return parseInt(fee.classAmounts?.[studentClass] || 0);
+            return parseInt(fee.amount || 0);
+        };
+        const feeAppliesToStudent = (fee, studentClass) => fee?.mode === 'ALL' || fee?.applyTo === 'ALL' || fee?.applyTo === studentClass || (fee?.mode === 'MULTI' && parseInt(fee.classAmounts?.[studentClass] || 0) > 0);
+
+        const DashboardTab = ({ students, settings, dynamicMonths }) => {
+            const totalStudents = students.length;
+            const groups = new Set(students.map(s => s.groupId)).size;
+            const monthlyCollected = students.reduce((sum, s) => sum + Object.values(s.payments || {}).reduce((a, p) => a + parseInt(p.amount || 0), 0), 0);
+            const extraCollected = students.reduce((sum, s) => sum + Object.values(s.extraFeePayments || {}).reduce((a, p) => a + parseInt(p.amount || 0), 0), 0);
+            const arrears = students.reduce((sum, s) => sum + parseInt(s.pendingArrears || 0), 0);
+            const paidCells = students.reduce((sum, s) => sum + dynamicMonths.filter(m => s.payments?.[m]).length, 0);
+            const totalCells = totalStudents * dynamicMonths.length;
+            const classRows = CLASSES.map(cls => ({ cls, count: students.filter(s => s.studentClass === cls).length, boys: students.filter(s => s.studentClass === cls && s.gender === 'M').length, girls: students.filter(s => s.studentClass === cls && s.gender === 'F').length })).filter(r => r.count);
+            return <div className="space-y-6">
+                <div className="bg-gradient-to-r from-green-700 to-emerald-600 text-white rounded-2xl p-6 shadow-lg"><h2 className="text-2xl font-black">Dashboard</h2><p className="text-green-100">Students, family fee groups, collections and pending dues at a glance.</p></div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+                    {[[totalStudents,'Total Students','bg-blue-600'],[groups,'Fee Groups','bg-yellow-600'],[`₹${monthlyCollected}`,'Monthly Collected','bg-green-600'],[`₹${extraCollected}`,'Extra Fee Collected','bg-purple-600'],[`₹${arrears}`,'Pending Arrears','bg-red-600']].map(([v,l,c]) => <div className={`${c} text-white rounded-xl p-5 shadow`}><div className="text-3xl font-black">{v}</div><div className="text-sm opacity-90 font-bold">{l}</div></div>)}
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-2 bg-white rounded-xl border shadow p-5"><h3 className="font-black text-gray-800 mb-4">Class Strength</h3><div className="space-y-3">{classRows.map(r => <div key={r.cls}><div className="flex justify-between text-sm font-bold"><span>Class {r.cls}</span><span>{r.count} ({r.boys} M / {r.girls} F)</span></div><div className="h-2 bg-gray-100 rounded"><div className="h-2 bg-green-500 rounded" style={{width: `${Math.max(5,(r.count/Math.max(1,totalStudents))*100)}%`}}></div></div></div>)}</div></div>
+                    <div className="bg-white rounded-xl border shadow p-5"><h3 className="font-black text-gray-800 mb-4">Fee Completion</h3><div className="text-5xl font-black text-green-700">{totalCells ? Math.round((paidCells/totalCells)*100) : 0}%</div><p className="text-sm text-gray-500 mt-2">{paidCells} of {totalCells} monthly fee entries recorded.</p><div className="mt-4 h-3 bg-gray-100 rounded"><div className="h-3 bg-green-600 rounded" style={{width: `${totalCells ? (paidCells/totalCells)*100 : 0}%`}}></div></div></div>
+                </div>
+            </div>;
         };
 
         // --- STUDENTS TAB COMPONENT ---
@@ -296,15 +337,9 @@
                 });
             };
 
-            const handleAddSingle = async () => {
-                const newDocRef = db.collection('students').doc();
-                const newId = newDocRef.id;
-                await newDocRef.set({
-                    name: 'NEW STUDENT', studentClass: '+2', gender: 'M', guardian: '', phone: '',
-                    groupId: newId, pendingArrears: 0, groupFee: null, payments: {}, extraFeePayments: {},
-                    profile: { dob:'', address:'', adhaar:'', admNo:'', samasthaId:'', admDate:'' }
-                });
-                setSelectedFamilyStudent({ id: newId, name: 'NEW STUDENT', groupId: newId });
+            const handleAddSingle = () => {
+                const tempId = 'NEW_' + Date.now();
+                setSelectedFamilyStudent({ id: tempId, name: '', studentClass: '+2', gender: 'M', guardian: '', phone: '', groupId: tempId, pendingArrears: 0, groupFee: null, payments: {}, extraFeePayments: {}, profile: {}, isNew: true });
                 setFamilyModalOpen(true);
             };
 
@@ -343,6 +378,7 @@
                             <select className="px-2 py-1.5 border rounded text-sm bg-white font-medium text-blue-700" value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setCurrentPage(1); }}>
                                 <option value="ALL">Status: All</option><option value="CONCESSION">Concessions Only</option><option value="GROUPED">Grouped Siblings</option><option value="ARREARS">Pending Arrears</option>
                             </select>
+                            <button onClick={() => { setSearch(''); setClassFilter(''); setSortOption('CLASS_DESC'); setGenderSort('MIXED'); setStatusFilter('ALL'); setCurrentPage(1); }} className="px-3 py-1.5 rounded bg-gray-700 text-white text-sm font-bold hover:bg-gray-800">Clear</button>
 
                             <div className="border-l border-gray-300 mx-1 h-6 hidden xl:block"></div>
 
@@ -387,8 +423,8 @@
                                         const hasConcession = student.groupFee !== null && student.groupFee !== (groupMembers.length * settings.globalBaseFee);
                                         
                                         // Calculate Extra Fees Due
-                                        const appExtraFees = settings.extraFees?.filter(f => f.applyTo === 'ALL' || f.applyTo === student.studentClass) || [];
-                                        const totalExFee = appExtraFees.reduce((sum, f) => sum + parseInt(f.amount), 0);
+                                        const appExtraFees = settings.extraFees?.filter(f => feeAppliesToStudent(f, student.studentClass)) || [];
+                                        const totalExFee = appExtraFees.reduce((sum, f) => sum + feeAmountForStudent(f, student.studentClass), 0);
                                         const paidExFee = Object.values(student.extraFeePayments || {}).reduce((sum, p) => sum + parseInt(p.amount), 0);
                                         const dueExFee = totalExFee - paidExFee;
 
@@ -433,10 +469,10 @@
                                                 {dynamicMonths.map(month => {
                                                     const payment = student.payments?.[month];
                                                     return (
-                                                        <td key={month} className="px-1 py-1 border-r cursor-pointer hover:bg-gray-100 transition-colors custom-tooltip relative" onClick={() => openPaymentModal(groupMembers, month)}>
+                                                        <td key={month} className={`px-1 py-1 border-r cursor-pointer transition-colors custom-tooltip relative ${payment ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-red-50'}`} onClick={() => openPaymentModal(groupMembers, month)}>
                                                             <div className="flex flex-col items-center justify-center h-full">
                                                                 {!payment ? (
-                                                                    <span className="w-6 h-6 rounded border border-dashed border-gray-300 flex items-center justify-center text-gray-300 text-[10px]">+</span>
+                                                                    <span className="w-6 h-6 rounded-full bg-red-100 border border-red-300 flex items-center justify-center text-red-600 text-[10px] font-black">!</span>
                                                                 ) : (
                                                                     <div className={`w-6 h-6 rounded-full flex items-center justify-center ${payment.status === 'FULL' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'}`}>
                                                                         {payment.status === 'FULL' ? <Icons.Check /> : <Icons.Warning />}
@@ -449,6 +485,7 @@
                                                                     <div className="font-bold border-b border-gray-700 pb-1 mb-1 text-center">{month} Payment</div>
                                                                     <div><span className="text-gray-400">Date:</span> {payment.date}</div>
                                                                     <div><span className="text-gray-400">Paid:</span> ₹{payment.amount}</div>
+                                                                    <div><span className="text-gray-400">Balance:</span> ₹{payment.arrearsAdded || 0}</div>
                                                                     {payment.arrearsAdded > 0 && <div className="text-red-300"><span className="text-gray-400">Arrears Added:</span> ₹{payment.arrearsAdded}</div>}
                                                                     <div><span className="text-gray-400">Rec:</span> {payment.receipt || 'N/A'}</div>
                                                                 </div>
@@ -595,18 +632,20 @@
 
             const handleSave = async (e) => {
                 e.preventDefault();
+                if (!stName.trim()) return showAlert('Student name is required before saving.', 'Missing Info');
                 const batch = db.batch();
-                const finalGroupId = members[0]?.groupId || db.collection('students').doc().id;
                 const finalFee = groupFee ? parseInt(groupFee) : null;
                 const finalArrears = parseInt(pendingArrears || 0);
 
-                const primaryRef = db.collection('students').doc(primaryStudent.id);
-                batch.update(primaryRef, { 
+                const primaryRef = primaryStudent.isNew ? db.collection('students').doc() : db.collection('students').doc(primaryStudent.id);
+                const finalGroupId = primaryStudent.isNew ? primaryRef.id : (members[0]?.groupId || db.collection('students').doc().id);
+                const primaryPayload = {
                     name: stName.toUpperCase(), studentClass: stClass, gender: stGender,
-                    profile: { dob: stDob, address: stAddress, adhaar: stAdhaar, admNo: stAdmNo, admDate: stAdmDate, samasthaId: stSamasthaId }
-                });
+                    profile: { dob: stDob, address: stAddress, adhaar: stAdhaar, admNo: stAdmNo, admDate: stAdmDate, samasthaId: stSamasthaId }, payments: primaryStudent.payments || {}, extraFeePayments: primaryStudent.extraFeePayments || {}
+                };
+                primaryStudent.isNew ? batch.set(primaryRef, { ...primaryPayload, groupId: primaryRef.id, guardian: guardian.toUpperCase(), phone: phone, groupFee: finalFee, pendingArrears: finalArrears }) : batch.update(primaryRef, primaryPayload);
 
-                members.forEach(m => {
+                members.filter(m => !m.isNew).forEach(m => {
                     const docRef = db.collection('students').doc(m.id);
                     batch.update(docRef, {
                         groupId: finalGroupId, guardian: guardian.toUpperCase(), phone: phone,
@@ -722,7 +761,7 @@
                         </div>
 
                         <div className="bg-white px-6 py-4 border-t flex justify-between items-center shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] rounded-b-lg">
-                            <button type="button" onClick={() => setConfirmDeleteOpen(true)} className="text-red-600 font-bold text-sm hover:underline">Delete Record</button>
+                            {!primaryStudent.isNew ? <button type="button" onClick={() => setConfirmDeleteOpen(true)} className="text-red-600 font-bold text-sm hover:underline">Delete Record</button> : <span></span>}
                             <div className="space-x-3">
                                 <button type="button" onClick={onClose} className="px-5 py-2.5 border border-gray-300 rounded-md hover:bg-gray-50 font-bold text-gray-700 transition-colors">Cancel</button>
                                 <button type="button" onClick={handleSave} className="px-8 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-yellow-950 rounded-md font-extrabold shadow-md transition-colors">Save All Details</button>
@@ -823,7 +862,7 @@
         // --- EXTRA FEE MODAL (NEW) ---
         const ExtraFeeModal = ({ student, settings, onClose, showAlert }) => {
             if (!student) return null;
-            const applicableFees = settings.extraFees?.filter(f => f.applyTo === 'ALL' || f.applyTo === student.studentClass) || [];
+            const applicableFees = settings.extraFees?.filter(f => feeAppliesToStudent(f, student.studentClass)) || [];
             
             const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
             const [receipt, setReceipt] = useState('');
@@ -856,7 +895,7 @@
                                         <div key={fee.id} className="border border-purple-200 bg-purple-50 p-4 rounded-lg">
                                             <div className="flex justify-between items-center mb-2">
                                                 <span className="font-bold text-purple-900">{fee.name}</span>
-                                                <span className="font-bold bg-white px-2 py-1 rounded text-sm shadow-sm">₹{fee.amount}</span>
+                                                <span className="font-bold bg-white px-2 py-1 rounded text-sm shadow-sm">₹{feeAmountForStudent(fee, student.studentClass)}</span>
                                             </div>
                                             
                                             {payment ? (
@@ -877,12 +916,12 @@
                                                     <div><label className="text-xs font-bold text-gray-500">Paying Amount</label><input type="number" className="w-full border p-2 rounded font-bold text-lg" value={amountInput} onChange={e => setAmountInput(e.target.value)} /></div>
                                                     <div className="flex justify-end space-x-2 pt-2 border-t">
                                                         <button onClick={() => setPayingFeeId(null)} className="px-3 py-1 bg-gray-200 rounded text-xs font-bold">Cancel</button>
-                                                        <button onClick={() => handlePay(fee.id, fee.amount)} className="px-4 py-1 bg-purple-600 text-white rounded text-xs font-bold shadow">Save Payment</button>
+                                                        <button onClick={() => handlePay(fee.id, feeAmountForStudent(fee, student.studentClass))} className="px-4 py-1 bg-purple-600 text-white rounded text-xs font-bold shadow">Save Payment</button>
                                                     </div>
                                                 </div>
                                             ) : (
                                                 <div className="mt-3 flex justify-end">
-                                                    <button onClick={() => { setPayingFeeId(fee.id); setAmountInput(fee.amount); setReceipt(''); setPayDate(new Date().toISOString().split('T')[0]); }} className="bg-purple-600 text-white px-4 py-1.5 rounded text-sm font-bold shadow hover:bg-purple-700 transition">Pay Now</button>
+                                                    <button onClick={() => { setPayingFeeId(fee.id); setAmountInput(feeAmountForStudent(fee, student.studentClass)); setReceipt(''); setPayDate(new Date().toISOString().split('T')[0]); }} className="bg-purple-600 text-white px-4 py-1.5 rounded text-sm font-bold shadow hover:bg-purple-700 transition">Pay Now</button>
                                                 </div>
                                             )}
                                         </div>
@@ -895,93 +934,80 @@
             );
         };
 
-        // --- SETTINGS TAB (Added Academic Year & Extra Fees Master) ---
+        // --- SETTINGS TAB (Institution profile, Academic Year & Extra Fees Master) ---
         const SettingsTab = ({ settings, ALL_MONTHS_BASE, showAlert }) => {
             const [baseFee, setBaseFee] = useState(settings.globalBaseFee || 500);
             const [startMonth, setStartMonth] = useState(settings.academicStartMonth || 'Jun');
             const [endMonth, setEndMonth] = useState(settings.academicEndMonth || 'May');
+            const [institutionName, setInstitutionName] = useState(settings.institutionName || '');
+            const [institutionPlace, setInstitutionPlace] = useState(settings.institutionPlace || '');
+            const [registerNumber, setRegisterNumber] = useState(settings.registerNumber || '');
+            const [logo, setLogo] = useState(settings.logo || '');
             const [extraFees, setExtraFees] = useState(settings.extraFees || []);
             const [saving, setSaving] = useState(false);
 
-            // Temp state for new extra fee
             const [newFeeName, setNewFeeName] = useState('');
+            const [newFeeMode, setNewFeeMode] = useState('ALL');
             const [newFeeAmount, setNewFeeAmount] = useState('');
-            const [newFeeClass, setNewFeeClass] = useState('ALL');
+            const [newFeeClass, setNewFeeClass] = useState('+2');
+            const [classAmounts, setClassAmounts] = useState(Object.fromEntries(CLASSES.map(c => [c, ''])));
 
             const addExtraFee = () => {
-                if(!newFeeName || !newFeeAmount) return showAlert("Please enter Fee Name and Amount.", "Missing Info");
-                const newFee = { id: 'FEE_' + Date.now(), name: newFeeName.toUpperCase(), amount: parseInt(newFeeAmount), applyTo: newFeeClass };
+                if(!newFeeName) return showAlert("Please enter Fee Name.", "Missing Info");
+                let newFee = { id: 'FEE_' + Date.now(), name: newFeeName.toUpperCase(), mode: newFeeMode };
+                if (newFeeMode === 'MULTI') {
+                    const cleaned = Object.fromEntries(Object.entries(classAmounts).map(([k,v]) => [k, parseInt(v || 0)]));
+                    if (!Object.values(cleaned).some(v => v > 0)) return showAlert("Enter at least one class amount.", "Missing Info");
+                    newFee.classAmounts = cleaned; newFee.applyTo = 'MULTI'; newFee.amount = 0;
+                } else {
+                    if(!newFeeAmount) return showAlert("Please enter amount.", "Missing Info");
+                    newFee.amount = parseInt(newFeeAmount); newFee.applyTo = newFeeMode === 'ALL' ? 'ALL' : newFeeClass;
+                }
                 setExtraFees([...extraFees, newFee]);
-                setNewFeeName(''); setNewFeeAmount(''); setNewFeeClass('ALL');
+                setNewFeeName(''); setNewFeeAmount(''); setNewFeeMode('ALL'); setNewFeeClass('+2'); setClassAmounts(Object.fromEntries(CLASSES.map(c => [c, ''])));
             };
             const removeExtraFee = (id) => setExtraFees(extraFees.filter(f => f.id !== id));
+            const describeFee = (fee) => fee.mode === 'MULTI' ? 'Different amount for each class' : (fee.applyTo === 'ALL' ? 'All classes - same amount' : `Only Class ${fee.applyTo}`);
+            const displayAmount = (fee) => fee.mode === 'MULTI' ? CLASSES.map(c => `${c}: ₹${fee.classAmounts?.[c] || 0}`).join(' | ') : `₹${fee.amount}`;
 
             const handleSave = async (e) => {
-                e.preventDefault();
-                setSaving(true);
+                e.preventDefault(); setSaving(true);
                 await db.collection('settings').doc('global').set({ 
-                    globalBaseFee: parseInt(baseFee), 
-                    academicStartMonth: startMonth, 
-                    academicEndMonth: endMonth,
-                    extraFees: extraFees
+                    globalBaseFee: parseInt(baseFee), academicStartMonth: startMonth, academicEndMonth: endMonth,
+                    institutionName: institutionName.trim(), institutionPlace: institutionPlace.trim(), registerNumber: registerNumber.trim(), logo: logo.trim(), extraFees
                 }, { merge: true });
-                setSaving(false);
-                showAlert("Settings updated successfully! The table will now reflect these changes.", "Success");
+                setSaving(false); showAlert("Settings updated successfully!", "Success");
             };
 
             return (
-                <div className="max-w-4xl mx-auto mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* General Settings */}
+                <div className="max-w-6xl mx-auto mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100 flex flex-col">
-                        <div className="flex items-center mb-6 border-b pb-4"><div className="p-3 bg-green-100 text-green-700 rounded-lg mr-4"><Icons.Settings /></div><div><h2 className="text-xl font-bold">General Configuration</h2></div></div>
+                        <div className="flex items-center mb-6 border-b pb-4"><div className="p-3 bg-green-100 text-green-700 rounded-lg mr-4"><Icons.Settings /></div><div><h2 className="text-xl font-bold">Institution & General Configuration</h2></div></div>
                         <form onSubmit={handleSave} className="flex-1 flex flex-col">
-                            <div className="space-y-5 flex-1">
-                                <div><label className="block text-sm font-bold mb-1 text-gray-700">Default Base Fee (₹)</label><input type="number" required min="0" className="w-full px-4 py-2 border rounded-md text-lg font-bold focus:ring-green-500 outline-none" value={baseFee} onChange={e => setBaseFee(e.target.value)} /></div>
-                                
-                                <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg">
-                                    <label className="block text-sm font-bold mb-3 text-blue-900">Academic Year Months</label>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="text-xs text-blue-700 font-bold">Starts From</label>
-                                            <select className="w-full p-2 border rounded bg-white outline-none" value={startMonth} onChange={e => setStartMonth(e.target.value)}>{ALL_MONTHS_BASE.map(m => <option key={m} value={m}>{m}</option>)}</select>
-                                        </div>
-                                        <div>
-                                            <label className="text-xs text-blue-700 font-bold">Ends In</label>
-                                            <select className="w-full p-2 border rounded bg-white outline-none" value={endMonth} onChange={e => setEndMonth(e.target.value)}>{ALL_MONTHS_BASE.map(m => <option key={m} value={m}>{m}</option>)}</select>
-                                        </div>
-                                    </div>
-                                    <p className="text-[10px] mt-2 text-blue-600">Table columns will be arranged exactly in this order.</p>
+                            <div className="space-y-4 flex-1">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div><label className="block text-sm font-bold mb-1 text-gray-700">Institution Name</label><input className="w-full px-4 py-2 border rounded-md font-bold outline-none" value={institutionName} onChange={e => setInstitutionName(e.target.value)} /></div>
+                                    <div><label className="block text-sm font-bold mb-1 text-gray-700">Place</label><input className="w-full px-4 py-2 border rounded-md font-bold outline-none" value={institutionPlace} onChange={e => setInstitutionPlace(e.target.value)} /></div>
+                                    <div><label className="block text-sm font-bold mb-1 text-gray-700">Register Number</label><input className="w-full px-4 py-2 border rounded-md font-bold outline-none" value={registerNumber} onChange={e => setRegisterNumber(e.target.value)} /></div>
+                                    <div><label className="block text-sm font-bold mb-1 text-gray-700">Logo URL / Base64</label><input className="w-full px-4 py-2 border rounded-md outline-none" value={logo} onChange={e => setLogo(e.target.value)} /></div>
                                 </div>
+                                {logo && <img src={logo} className="w-20 h-20 rounded-full object-cover border" />}
+                                <div><label className="block text-sm font-bold mb-1 text-gray-700">Default Base Fee (₹)</label><input type="number" required min="0" className="w-full px-4 py-2 border rounded-md text-lg font-bold outline-none" value={baseFee} onChange={e => setBaseFee(e.target.value)} /></div>
+                                <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg"><label className="block text-sm font-bold mb-3 text-blue-900">Academic Year Months</label><div className="grid grid-cols-2 gap-4"><select className="w-full p-2 border rounded bg-white" value={startMonth} onChange={e => setStartMonth(e.target.value)}>{ALL_MONTHS_BASE.map(m => <option key={m}>{m}</option>)}</select><select className="w-full p-2 border rounded bg-white" value={endMonth} onChange={e => setEndMonth(e.target.value)}>{ALL_MONTHS_BASE.map(m => <option key={m}>{m}</option>)}</select></div></div>
                             </div>
-                            <button type="submit" disabled={saving} className="mt-6 w-full py-3 bg-green-600 hover:bg-green-700 rounded-md font-bold text-white transition-all shadow-md">Save All Settings</button>
+                            <button type="submit" disabled={saving} className="mt-6 w-full py-3 bg-green-600 hover:bg-green-700 rounded-md font-bold text-white shadow-md">{saving ? 'Saving...' : 'Save All Settings'}</button>
                         </form>
                     </div>
-
-                    {/* Extra Fees Master */}
                     <div className="bg-white p-6 rounded-xl shadow-md border border-purple-100 flex flex-col">
-                        <div className="flex items-center mb-6 border-b border-purple-100 pb-4"><div className="p-3 bg-purple-100 text-purple-700 rounded-lg mr-4"><Icons.PlusCircle /></div><div><h2 className="text-xl font-bold text-purple-900">Extra Fees Master</h2><p className="text-xs text-purple-600">Exam fee, Admission fee etc.</p></div></div>
-                        
-                        <div className="bg-purple-50 p-4 rounded-lg border border-purple-200 mb-4">
-                            <h4 className="text-xs font-bold text-purple-800 mb-2">Create New Extra Fee</h4>
-                            <div className="space-y-2">
-                                <input type="text" placeholder="Fee Name (e.g. EXAM FEE)" className="w-full p-2 text-sm border rounded uppercase outline-none" value={newFeeName} onChange={e => setNewFeeName(e.target.value)} />
-                                <div className="flex space-x-2">
-                                    <input type="number" placeholder="Amount (₹)" className="w-1/3 p-2 text-sm border rounded outline-none font-bold" value={newFeeAmount} onChange={e => setNewFeeAmount(e.target.value)} />
-                                    <select className="w-1/3 p-2 text-sm border rounded outline-none" value={newFeeClass} onChange={e => setNewFeeClass(e.target.value)}><option value="ALL">All Classes</option>{CLASSES.map(c => <option key={c} value={c}>Class {c}</option>)}</select>
-                                    <button onClick={addExtraFee} type="button" className="w-1/3 bg-purple-600 text-white text-sm font-bold rounded shadow hover:bg-purple-700">Add Fee</button>
-                                </div>
-                            </div>
+                        <div className="flex items-center mb-6 border-b border-purple-100 pb-4"><div className="p-3 bg-purple-100 text-purple-700 rounded-lg mr-4"><Icons.PlusCircle /></div><div><h2 className="text-xl font-bold text-purple-900">Extra Fees Master</h2><p className="text-xs text-purple-600">All classes same, one class only, or different amount per class.</p></div></div>
+                        <div className="bg-purple-50 p-4 rounded-lg border border-purple-200 mb-4 space-y-3">
+                            <input type="text" placeholder="Fee Name (e.g. EXAM FEE)" className="w-full p-2 text-sm border rounded uppercase" value={newFeeName} onChange={e => setNewFeeName(e.target.value)} />
+                            <select className="w-full p-2 text-sm border rounded" value={newFeeMode} onChange={e => setNewFeeMode(e.target.value)}><option value="ALL">All classes - same amount</option><option value="SINGLE">Only one class</option><option value="MULTI">Different amount for every class</option></select>
+                            {newFeeMode !== 'MULTI' ? <div className="flex gap-2"><input type="number" placeholder="Amount (₹)" className="flex-1 p-2 text-sm border rounded font-bold" value={newFeeAmount} onChange={e => setNewFeeAmount(e.target.value)} />{newFeeMode === 'SINGLE' && <select className="flex-1 p-2 text-sm border rounded" value={newFeeClass} onChange={e => setNewFeeClass(e.target.value)}>{CLASSES.map(c => <option key={c} value={c}>Class {c}</option>)}</select>}</div> : <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">{CLASSES.map(c => <input key={c} type="number" placeholder={`Class ${c}`} className="p-2 text-sm border rounded" value={classAmounts[c]} onChange={e => setClassAmounts({...classAmounts, [c]: e.target.value})} />)}</div>}
+                            <button onClick={addExtraFee} type="button" className="w-full bg-purple-600 text-white py-2 text-sm font-bold rounded shadow hover:bg-purple-700">Add Fee Item</button>
                         </div>
-
                         <div className="flex-1 overflow-y-auto space-y-2">
-                            {extraFees.length === 0 ? <p className="text-sm text-gray-500 text-center py-4">No Extra Fees configured.</p> : 
-                                extraFees.map(fee => (
-                                    <div key={fee.id} className="flex justify-between items-center bg-white border border-gray-200 p-3 rounded shadow-sm">
-                                        <div><div className="font-bold text-sm text-gray-800">{fee.name}</div><div className="text-[10px] font-bold text-purple-600 bg-purple-100 px-1 inline-block rounded mt-1">Applies to: {fee.applyTo === 'ALL' ? 'ALL CLASSES' : `Class ${fee.applyTo}`}</div></div>
-                                        <div className="flex items-center space-x-3"><span className="font-bold text-lg text-gray-700">₹{fee.amount}</span><button onClick={() => removeExtraFee(fee.id)} className="text-red-500 hover:text-red-700 p-1"><Icons.Trash /></button></div>
-                                    </div>
-                                ))
-                            }
+                            {extraFees.length === 0 ? <p className="text-sm text-gray-500 text-center py-4">No Extra Fees configured.</p> : extraFees.map(fee => <div key={fee.id} className="bg-white border border-gray-200 p-3 rounded shadow-sm"><div className="flex justify-between gap-3"><div><div className="font-bold text-sm text-gray-800">{fee.name}</div><div className="text-[10px] font-bold text-purple-600 bg-purple-100 px-1 inline-block rounded mt-1">{describeFee(fee)}</div><div className="text-xs text-gray-600 mt-1 break-words">{displayAmount(fee)}</div></div><button onClick={() => removeExtraFee(fee.id)} className="text-red-500 hover:text-red-700 p-1"><Icons.Trash /></button></div></div>)}
                         </div>
                     </div>
                 </div>
