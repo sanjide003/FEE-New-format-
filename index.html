@@ -29,6 +29,7 @@
         ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
         .table-container { max-height: calc(100vh - 250px); overflow-y: auto; }
+        .custom-tooltip:hover .tooltip-text { visibility: visible; opacity: 1; }
     </style>
 </head>
 <body>
@@ -52,7 +53,7 @@
         const db = firebase.firestore();
 
         // Constants 
-        const MONTHS = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
+        const ALL_MONTHS_BASE = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         const CLASSES = ['+2', '+1', '10', '9', '8', '7', '6', '5', '4', '3', '2', '1'];
 
         // Icons Component
@@ -68,20 +69,38 @@
             Users: () => <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>,
             Link: () => <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>,
             Upload: () => <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>,
-            UserCircle: () => <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            UserCircle: () => <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>,
+            PlusCircle: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
         };
 
-        const CustomConfirm = ({ isOpen, message, onConfirm, onCancel, confirmText = "Confirm", type = "danger" }) => {
+        // --- CUSTOM UI MODALS ---
+        const CustomConfirm = ({ isOpen, title = "Confirm", message, onConfirm, onCancel, confirmText = "Confirm", type = "danger" }) => {
             if (!isOpen) return null;
             return (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
-                    <div className="bg-white rounded-lg shadow-xl max-w-sm w-full p-6">
-                        <h3 className="text-lg font-bold mb-4">{message}</h3>
+                <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 transform transition-all">
+                        <h3 className={`text-lg font-bold mb-2 ${type === 'danger' ? 'text-red-600' : 'text-blue-600'}`}>{title}</h3>
+                        <p className="text-gray-700 mb-6 text-sm leading-relaxed">{message}</p>
                         <div className="flex justify-end space-x-3">
-                            <button onClick={onCancel} className="px-4 py-2 border rounded-md hover:bg-gray-100">Cancel</button>
-                            <button onClick={onConfirm} className={`px-4 py-2 rounded-md text-white ${type === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
+                            <button onClick={onCancel} className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 text-sm font-bold text-gray-700">Cancel</button>
+                            <button onClick={onConfirm} className={`px-4 py-2 rounded-md text-white text-sm font-bold shadow-md ${type === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
                                 {confirmText}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const CustomAlert = ({ isOpen, title = "Notice", message, onClose }) => {
+            if (!isOpen) return null;
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6">
+                        <h3 className="text-lg font-bold mb-2 text-gray-800">{title}</h3>
+                        <p className="text-gray-600 mb-6 text-sm">{message}</p>
+                        <div className="flex justify-end">
+                            <button onClick={onClose} className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-bold shadow-md">OK</button>
                         </div>
                     </div>
                 </div>
@@ -92,14 +111,31 @@
         const App = () => {
             const [activeTab, setActiveTab] = useState('STUDENTS');
             const [students, setStudents] = useState([]);
-            const [settings, setSettings] = useState({ globalBaseFee: 500 });
+            const [settings, setSettings] = useState({ 
+                globalBaseFee: 500, 
+                academicStartMonth: 'Jun', 
+                academicEndMonth: 'May',
+                extraFees: [] 
+            });
             const [loading, setLoading] = useState(true);
             const [error, setError] = useState(null);
 
+            // Global Alert State
+            const [alertState, setAlertState] = useState({ isOpen: false, title: '', message: '' });
+            const showAlert = (message, title = "Notice") => setAlertState({ isOpen: true, message, title });
+
             useEffect(() => {
                 const unsubSettings = db.collection('settings').doc('global').onSnapshot(doc => {
-                    if (doc.exists) setSettings(doc.data());
-                    else db.collection('settings').doc('global').set({ globalBaseFee: 500 });
+                    if (doc.exists) {
+                        setSettings({
+                            globalBaseFee: doc.data().globalBaseFee || 500,
+                            academicStartMonth: doc.data().academicStartMonth || 'Jun',
+                            academicEndMonth: doc.data().academicEndMonth || 'May',
+                            extraFees: doc.data().extraFees || []
+                        });
+                    } else {
+                        db.collection('settings').doc('global').set({ globalBaseFee: 500, academicStartMonth: 'Jun', academicEndMonth: 'May', extraFees: [] });
+                    }
                 }, err => setError("Database Rules Error."));
 
                 const unsubStudents = db.collection('students').onSnapshot(snapshot => {
@@ -111,6 +147,16 @@
 
                 return () => { unsubSettings(); unsubStudents(); };
             }, []);
+
+            // Generate Dynamic Academic Months based on Settings
+            const dynamicMonths = useMemo(() => {
+                let res = [];
+                let s = ALL_MONTHS_BASE.indexOf(settings.academicStartMonth);
+                let e = ALL_MONTHS_BASE.indexOf(settings.academicEndMonth);
+                if (s <= e) res = ALL_MONTHS_BASE.slice(s, e + 1);
+                else res = [...ALL_MONTHS_BASE.slice(s), ...ALL_MONTHS_BASE.slice(0, e + 1)];
+                return res;
+            }, [settings.academicStartMonth, settings.academicEndMonth]);
 
             if (error) return <div className="min-h-screen flex items-center justify-center text-red-600 font-bold">{error}</div>;
             if (loading) return <div className="min-h-screen flex items-center justify-center animate-pulse text-gray-500 font-bold">Loading Data...</div>;
@@ -127,17 +173,22 @@
                         </div>
                     </header>
                     <main className="flex-1 max-w-full w-full mx-auto p-4 sm:p-6 lg:p-8 bg-white shadow-inner">
-                        {activeTab === 'STUDENTS' ? <StudentTab students={students} settings={settings} /> : <SettingsTab settings={settings} />}
+                        {activeTab === 'STUDENTS' ? 
+                            <StudentTab students={students} settings={settings} dynamicMonths={dynamicMonths} showAlert={showAlert} /> : 
+                            <SettingsTab settings={settings} ALL_MONTHS_BASE={ALL_MONTHS_BASE} showAlert={showAlert} />
+                        }
                     </main>
+
+                    <CustomAlert isOpen={alertState.isOpen} title={alertState.title} message={alertState.message} onClose={() => setAlertState({ isOpen: false, title: '', message: '' })} />
                 </div>
             );
         };
 
         // --- STUDENTS TAB COMPONENT ---
-        const StudentTab = ({ students, settings }) => {
+        const StudentTab = ({ students, settings, dynamicMonths, showAlert }) => {
             const [search, setSearch] = useState('');
             
-            // 4-Stage Filters
+            // Filters
             const [classFilter, setClassFilter] = useState('');
             const [sortOption, setSortOption] = useState('CLASS_DESC');
             const [genderSort, setGenderSort] = useState('MIXED');
@@ -152,80 +203,58 @@
             const [paymentModalOpen, setPaymentModalOpen] = useState(false);
             const [paymentGroupData, setPaymentGroupData] = useState(null);
 
+            const [extraFeeModalOpen, setExtraFeeModalOpen] = useState(false);
+            const [extraFeeStudentData, setExtraFeeStudentData] = useState(null);
+
             const [profileModalOpen, setProfileModalOpen] = useState(false);
             const [selectedProfile, setSelectedProfile] = useState(null);
 
-            // CSV Upload State
             const fileInputRef = useRef(null);
             const [uploading, setUploading] = useState(false);
             const [selectedUploadClass, setSelectedUploadClass] = useState('');
 
-            // Helper to get grouped students
             const getGroupMembers = (groupId) => students.filter(s => s.groupId === groupId);
 
-            // Complex Filtering & Sorting Logic
             const filteredStudents = useMemo(() => {
                 let result = [...students];
-
-                // Search
                 if (search) {
                     const q = search.toLowerCase();
                     result = result.filter(s => 
-                        s.name?.toLowerCase().includes(q) || 
-                        s.phone?.includes(q) || 
-                        s.guardian?.toLowerCase().includes(q) ||
+                        s.name?.toLowerCase().includes(q) || s.phone?.includes(q) || s.guardian?.toLowerCase().includes(q) ||
                         (s.payments && Object.values(s.payments).some(p => p.receipt?.toLowerCase().includes(q)))
                     );
                 }
-
-                // 1. Class Filter
                 if (classFilter) result = result.filter(s => s.studentClass === classFilter);
-
-                // 4. Status Filter
-                if (statusFilter === 'ARREARS') {
-                    result = result.filter(s => (s.pendingArrears || 0) > 0);
-                } else if (statusFilter === 'GROUPED') {
-                    result = result.filter(s => getGroupMembers(s.groupId).length > 1);
-                } else if (statusFilter === 'CONCESSION') {
+                if (statusFilter === 'ARREARS') result = result.filter(s => (s.pendingArrears || 0) > 0);
+                else if (statusFilter === 'GROUPED') result = result.filter(s => getGroupMembers(s.groupId).length > 1);
+                else if (statusFilter === 'CONCESSION') {
                     result = result.filter(s => {
                         const members = getGroupMembers(s.groupId);
-                        const defaultFee = members.length * settings.globalBaseFee;
-                        return s.groupFee !== null && s.groupFee !== defaultFee;
+                        return s.groupFee !== null && s.groupFee !== (members.length * settings.globalBaseFee);
                     });
                 }
 
-                // Apply Sorting (Gender + Name/Adm)
                 result.sort((a, b) => {
-                    // Primary Sort: Gender (If not Mixed)
                     if (genderSort === 'BOYS_FIRST' && a.gender !== b.gender) return a.gender === 'M' ? -1 : 1;
                     if (genderSort === 'GIRLS_FIRST' && a.gender !== b.gender) return a.gender === 'F' ? -1 : 1;
-
-                    // Secondary Sort: Sort Option
                     if (sortOption === 'CLASS_DESC') {
-                        const idxA = CLASSES.indexOf(a.studentClass);
-                        const idxB = CLASSES.indexOf(b.studentClass);
+                        const idxA = CLASSES.indexOf(a.studentClass); const idxB = CLASSES.indexOf(b.studentClass);
                         if (idxA !== idxB) return idxA - idxB;
                         return (a.name || '').localeCompare(b.name || '');
                     }
                     if (sortOption === 'NAME_ASC') return (a.name || '').localeCompare(b.name || '');
                     if (sortOption === 'NAME_DESC') return (b.name || '').localeCompare(a.name || '');
-                    if (sortOption === 'ADM_NO') {
-                        const admA = parseInt(a.profile?.admNo) || 999999;
-                        const admB = parseInt(b.profile?.admNo) || 999999;
-                        return admA - admB;
-                    }
+                    if (sortOption === 'ADM_NO') return (parseInt(a.profile?.admNo) || 999999) - (parseInt(b.profile?.admNo) || 999999);
                     return 0;
                 });
-
                 return result;
             }, [students, search, classFilter, statusFilter, sortOption, genderSort, settings.globalBaseFee]);
 
             const totalPages = Math.ceil(filteredStudents.length / perPage);
             const paginatedStudents = filteredStudents.slice((currentPage - 1) * perPage, currentPage * perPage);
 
-            // --- CSV UPLOAD LOGIC (No Auto-Grouping) ---
             const triggerFileUpload = () => {
-                if (!selectedUploadClass) return alert("Please select a Class from the dropdown before uploading the CSV file.");
+                if (!selectedUploadClass) return showAlert("Please select a Target Class before uploading CSV.", "Upload Error");
                 fileInputRef.current.click();
             };
 
@@ -233,55 +262,36 @@
                 const file = e.target.files[0];
                 if (!file) return;
                 setUploading(true);
-
                 Papa.parse(file, {
-                    header: true,
-                    skipEmptyLines: true,
+                    header: true, skipEmptyLines: true,
                     complete: async (results) => {
                         try {
                             const batch = db.batch();
-                            const parsedData = results.data;
-                            
-                            parsedData.forEach(row => {
+                            results.data.forEach(row => {
                                 const rawName = row['Name'] || row['Student Name'] || row['Full Name'] || '';
                                 if (!rawName) return; 
-
-                                const rawPhone = (row['Mobile'] || row['Phone'] || '').trim();
-                                const rawGender = (row['Gender'] || '').trim().toUpperCase();
-                                
                                 const studentData = {
                                     name: rawName.trim().toUpperCase(),
                                     studentClass: selectedUploadClass,
-                                    gender: rawGender.startsWith('F') ? 'F' : 'M',
+                                    gender: (row['Gender'] || '').trim().toUpperCase().startsWith('F') ? 'F' : 'M',
                                     guardian: (row['Father'] || row['Guardian'] || '').trim().toUpperCase(),
-                                    phone: rawPhone,
-                                    pendingArrears: 0, 
-                                    groupFee: null,
-                                    payments: {},
-                                    // SOLO GROUPING (Disabled Auto-Group logic)
+                                    phone: (row['Mobile'] || row['Phone'] || '').trim(),
+                                    pendingArrears: 0, groupFee: null, payments: {}, extraFeePayments: {},
                                     groupId: db.collection('students').doc().id, 
                                     profile: {
-                                        dob: row['DOB'] || '',
-                                        address: row['Permanent Address'] || '',
-                                        adhaar: row['Adhaar'] || '',
-                                        admNo: row['Adm. No'] || '',
-                                        samasthaId: row['ID'] || '',
-                                        admDate: row['Adm. Date'] || ''
+                                        dob: row['DOB'] || '', address: row['Permanent Address'] || '',
+                                        adhaar: row['Adhaar'] || '', admNo: row['Adm. No'] || '',
+                                        samasthaId: row['ID'] || '', admDate: row['Adm. Date'] || ''
                                     }
                                 };
-                                const docRef = db.collection('students').doc(studentData.groupId);
-                                batch.set(docRef, studentData);
+                                batch.set(db.collection('students').doc(studentData.groupId), studentData);
                             });
-
                             await batch.commit();
-                            alert("Bulk upload successful! Students are imported as solo records (No Auto-Grouping).");
+                            showAlert(`Students imported successfully to Class ${selectedUploadClass}`, "Success");
                         } catch (err) {
-                            console.error("Upload error:", err);
-                            alert("Error uploading data. Please check your CSV format.");
+                            showAlert("Error uploading data. Check CSV format.", "Upload Error");
                         }
-                        setUploading(false);
-                        setSelectedUploadClass('');
-                        e.target.value = null;
+                        setUploading(false); setSelectedUploadClass(''); e.target.value = null;
                     }
                 });
             };
@@ -291,7 +301,7 @@
                 const newId = newDocRef.id;
                 await newDocRef.set({
                     name: 'NEW STUDENT', studentClass: '+2', gender: 'M', guardian: '', phone: '',
-                    groupId: newId, pendingArrears: 0, groupFee: null, payments: {}, 
+                    groupId: newId, pendingArrears: 0, groupFee: null, payments: {}, extraFeePayments: {},
                     profile: { dob:'', address:'', adhaar:'', admNo:'', samasthaId:'', admDate:'' }
                 });
                 setSelectedFamilyStudent({ id: newId, name: 'NEW STUDENT', groupId: newId });
@@ -305,9 +315,14 @@
                 setPaymentModalOpen(true);
             };
 
+            const openExtraFeeModal = (student) => {
+                setExtraFeeStudentData(student);
+                setExtraFeeModalOpen(true);
+            };
+
             return (
                 <div className="flex flex-col space-y-4">
-                    {/* Top Controls - 4 Stage Filters & Search */}
+                    {/* Top Controls */}
                     <div className="flex flex-col lg:flex-row justify-between items-center gap-3 bg-gray-50 p-4 rounded-lg border">
                         <div className="flex items-center space-x-2 w-full lg:w-1/4 relative">
                             <Icons.Search />
@@ -315,38 +330,22 @@
                         </div>
                         
                         <div className="flex flex-wrap items-center gap-2">
-                            {/* Filter 1: Class */}
                             <select className="px-2 py-1.5 border rounded text-sm bg-white" value={classFilter} onChange={e => { setClassFilter(e.target.value); setCurrentPage(1); }}>
                                 <option value="">Filter: All Classes</option>
                                 {CLASSES.map(c => <option key={c} value={c}>Class {c}</option>)}
                             </select>
-                            
-                            {/* Filter 2: Sort */}
                             <select className="px-2 py-1.5 border rounded text-sm bg-white" value={sortOption} onChange={e => { setSortOption(e.target.value); setCurrentPage(1); }}>
-                                <option value="CLASS_DESC">Sort: Class (+2 to 1)</option>
-                                <option value="NAME_ASC">Sort: Name (A-Z)</option>
-                                <option value="NAME_DESC">Sort: Name (Z-A)</option>
-                                <option value="ADM_NO">Sort: Admission No.</option>
+                                <option value="CLASS_DESC">Sort: Class (+2 to 1)</option><option value="NAME_ASC">Sort: Name (A-Z)</option><option value="NAME_DESC">Sort: Name (Z-A)</option><option value="ADM_NO">Sort: Admission No.</option>
                             </select>
-
-                            {/* Filter 3: Gender */}
                             <select className="px-2 py-1.5 border rounded text-sm bg-white" value={genderSort} onChange={e => { setGenderSort(e.target.value); setCurrentPage(1); }}>
-                                <option value="MIXED">Gender: Mixed</option>
-                                <option value="BOYS_FIRST">Boys First</option>
-                                <option value="GIRLS_FIRST">Girls First</option>
+                                <option value="MIXED">Gender: Mixed</option><option value="BOYS_FIRST">Boys First</option><option value="GIRLS_FIRST">Girls First</option>
                             </select>
-
-                            {/* Filter 4: Special Status */}
                             <select className="px-2 py-1.5 border rounded text-sm bg-white font-medium text-blue-700" value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setCurrentPage(1); }}>
-                                <option value="ALL">Status: All</option>
-                                <option value="CONCESSION">Concessions Only</option>
-                                <option value="GROUPED">Grouped Siblings</option>
-                                <option value="ARREARS">Pending Arrears</option>
+                                <option value="ALL">Status: All</option><option value="CONCESSION">Concessions Only</option><option value="GROUPED">Grouped Siblings</option><option value="ARREARS">Pending Arrears</option>
                             </select>
 
                             <div className="border-l border-gray-300 mx-1 h-6 hidden xl:block"></div>
 
-                            {/* CSV Upload Section */}
                             <div className="flex items-center bg-blue-50 border border-blue-200 rounded p-1">
                                 <select className="px-2 py-1 bg-transparent outline-none text-xs font-bold text-blue-800" value={selectedUploadClass} onChange={e => setSelectedUploadClass(e.target.value)}>
                                     <option value="">-- Target Class --</option>
@@ -358,29 +357,28 @@
                                 </button>
                             </div>
 
-                            <button onClick={handleAddSingle} className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded font-medium text-sm transition-colors shadow-sm">
-                                + Add Student
-                            </button>
+                            <button onClick={handleAddSingle} className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded font-medium text-sm transition-colors shadow-sm">+ Add Student</button>
                         </div>
                     </div>
 
-                    {/* Data Table (Optimized Layout) */}
+                    {/* Data Table */}
                     <div className="table-container border rounded-lg shadow-sm bg-white">
                         <table className="min-w-full text-sm text-left whitespace-nowrap">
                             <thead className="text-xs text-gray-700 uppercase bg-gray-100 sticky top-0 z-10 shadow-sm border-b">
                                 <tr>
-                                    <th className="px-3 py-2 w-12">No</th>
-                                    <th className="px-3 py-2 w-16">Class</th>
+                                    <th className="px-3 py-2 w-10">No</th>
+                                    <th className="px-3 py-2 w-14">Class</th>
                                     <th className="px-3 py-2">Student Name</th>
                                     <th className="px-3 py-2 border-r">Guardian & Contact</th>
-                                    <th className="px-3 py-2 text-center bg-yellow-50 text-yellow-800 border-r w-28">Group Setup</th>
-                                    <th className="px-3 py-2 text-right text-red-600 w-24 border-r">Arrears</th>
-                                    {MONTHS.map(m => <th key={m} className="px-2 py-2 text-center border-r w-12">{m}</th>)}
+                                    <th className="px-3 py-2 text-center bg-yellow-50 text-yellow-800 border-r w-24">Group Setup</th>
+                                    <th className="px-3 py-2 text-center bg-purple-50 text-purple-800 border-r w-24">Extra Fees</th>
+                                    <th className="px-3 py-2 text-right text-red-600 w-20 border-r">Arrears</th>
+                                    {dynamicMonths.map(m => <th key={m} className="px-2 py-2 text-center border-r w-12">{m}</th>)}
                                 </tr>
                             </thead>
                             <tbody>
                                 {paginatedStudents.length === 0 ? (
-                                    <tr><td colSpan={6 + MONTHS.length} className="text-center py-8 text-gray-500">No students match the current filters.</td></tr>
+                                    <tr><td colSpan={7 + dynamicMonths.length} className="text-center py-8 text-gray-500">No students match the current filters.</td></tr>
                                 ) : (
                                     paginatedStudents.map((student, idx) => {
                                         const groupMembers = getGroupMembers(student.groupId);
@@ -388,22 +386,26 @@
                                         const actualFee = student.groupFee || (groupMembers.length * settings.globalBaseFee);
                                         const hasConcession = student.groupFee !== null && student.groupFee !== (groupMembers.length * settings.globalBaseFee);
                                         
+                                        // Calculate Extra Fees Due
+                                        const appExtraFees = settings.extraFees?.filter(f => f.applyTo === 'ALL' || f.applyTo === student.studentClass) || [];
+                                        const totalExFee = appExtraFees.reduce((sum, f) => sum + parseInt(f.amount), 0);
+                                        const paidExFee = Object.values(student.extraFeePayments || {}).reduce((sum, p) => sum + parseInt(p.amount), 0);
+                                        const dueExFee = totalExFee - paidExFee;
+
                                         return (
                                             <tr key={student.id} className="bg-white border-b hover:bg-green-50 transition-colors">
                                                 <td className="px-3 py-2 text-gray-500 text-xs">{(currentPage - 1) * perPage + idx + 1}</td>
                                                 <td className="px-3 py-2 font-bold">{student.studentClass}</td>
                                                 
-                                                {/* Optimized: Name + Gender Badge */}
                                                 <td className="px-3 py-2">
                                                     <div className="flex items-center">
-                                                        <span className="font-bold text-blue-700 hover:text-blue-900 cursor-pointer hover:underline truncate max-w-[180px]" onClick={() => openProfileModal(student)}>
+                                                        <span className="font-bold text-blue-700 hover:text-blue-900 cursor-pointer hover:underline truncate max-w-[180px]" onClick={() => { setSelectedProfile(student); setProfileModalOpen(true); }}>
                                                             {student.name}
                                                         </span>
                                                         {student.gender === 'M' ? <Icons.Male/> : <Icons.Female/>}
                                                     </div>
                                                 </td>
 
-                                                {/* Optimized: Guardian + Phone Combined */}
                                                 <td className="px-3 py-2 border-r">
                                                     <div className="flex flex-col leading-tight">
                                                         <span className="font-semibold text-gray-800 text-xs truncate max-w-[160px]">{student.guardian || '-'}</span>
@@ -411,33 +413,46 @@
                                                     </div>
                                                 </td>
                                                 
-                                                {/* Group / Fee Setup Column */}
-                                                <td className="px-3 py-2 border-r text-center bg-yellow-50/20">
-                                                    <button onClick={() => { setSelectedFamilyStudent(student); setFamilyModalOpen(true); }} className={`w-full flex items-center justify-center px-2 py-1 bg-white border rounded font-bold shadow-sm transition-all text-[11px] tracking-wide ${hasConcession ? 'border-yellow-400 text-yellow-900 bg-yellow-50' : 'border-gray-200 text-gray-700 hover:border-yellow-300'}`}>
-                                                        {isGroup && <Icons.Link />}
-                                                        ₹{actualFee} {isGroup ? `(${groupMembers.length})` : ''}
+                                                <td className="px-2 py-2 border-r text-center bg-yellow-50/20">
+                                                    <button onClick={() => { setSelectedFamilyStudent(student); setFamilyModalOpen(true); }} className={`w-full flex items-center justify-center px-1 py-1 bg-white border rounded font-bold shadow-sm transition-all text-[11px] tracking-wide ${hasConcession ? 'border-yellow-400 text-yellow-900 bg-yellow-50' : 'border-gray-200 text-gray-700 hover:border-yellow-300'}`}>
+                                                        {isGroup && <Icons.Link />} ₹{actualFee} {isGroup ? `(${groupMembers.length})` : ''}
+                                                    </button>
+                                                </td>
+
+                                                <td className="px-2 py-2 border-r text-center bg-purple-50/20">
+                                                    <button onClick={() => openExtraFeeModal(student)} className={`w-full flex items-center justify-center px-1 py-1 bg-white border rounded font-bold shadow-sm text-[11px] ${dueExFee > 0 ? 'border-purple-300 text-purple-700' : 'border-gray-200 text-gray-400'}`}>
+                                                        {dueExFee > 0 ? `₹${dueExFee} Due` : 'Clear'}
                                                     </button>
                                                 </td>
                                                 
-                                                {/* Pending Arrears */}
                                                 <td className={`px-3 py-2 text-right font-bold border-r ${student.pendingArrears > 0 ? 'text-red-600 bg-red-50/50' : 'text-gray-300'}`}>
                                                     {student.pendingArrears > 0 ? `₹${student.pendingArrears}` : '0'}
                                                 </td>
 
-                                                {/* Months columns */}
-                                                {MONTHS.map(month => {
+                                                {/* Dynamic Months columns with Hover Detailed Tooltip */}
+                                                {dynamicMonths.map(month => {
                                                     const payment = student.payments?.[month];
                                                     return (
-                                                        <td key={month} className="px-1 py-1 border-r cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => openPaymentModal(groupMembers, month)}>
+                                                        <td key={month} className="px-1 py-1 border-r cursor-pointer hover:bg-gray-100 transition-colors custom-tooltip relative" onClick={() => openPaymentModal(groupMembers, month)}>
                                                             <div className="flex flex-col items-center justify-center h-full">
                                                                 {!payment ? (
                                                                     <span className="w-6 h-6 rounded border border-dashed border-gray-300 flex items-center justify-center text-gray-300 text-[10px]">+</span>
-                                                                ) : payment.status === 'FULL' ? (
-                                                                    <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center" title={`Paid: ₹${payment.amount}`}><Icons.Check /></div>
                                                                 ) : (
-                                                                    <div className="w-6 h-6 rounded-full bg-yellow-100 flex items-center justify-center" title={`Partial Paid: ₹${payment.amount}`}><Icons.Warning /></div>
+                                                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center ${payment.status === 'FULL' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'}`}>
+                                                                        {payment.status === 'FULL' ? <Icons.Check /> : <Icons.Warning />}
+                                                                    </div>
                                                                 )}
                                                             </div>
+                                                            {/* Custom Hover Tooltip */}
+                                                            {payment && (
+                                                                <div className="tooltip-text invisible opacity-0 absolute z-50 bg-gray-900 text-white text-[11px] rounded p-2 bottom-full mb-1 left-1/2 transform -translate-x-1/2 w-40 transition-opacity shadow-lg whitespace-normal leading-tight">
+                                                                    <div className="font-bold border-b border-gray-700 pb-1 mb-1 text-center">{month} Payment</div>
+                                                                    <div><span className="text-gray-400">Date:</span> {payment.date}</div>
+                                                                    <div><span className="text-gray-400">Paid:</span> ₹{payment.amount}</div>
+                                                                    {payment.arrearsAdded > 0 && <div className="text-red-300"><span className="text-gray-400">Arrears Added:</span> ₹{payment.arrearsAdded}</div>}
+                                                                    <div><span className="text-gray-400">Rec:</span> {payment.receipt || 'N/A'}</div>
+                                                                </div>
+                                                            )}
                                                         </td>
                                                     );
                                                 })}
@@ -461,16 +476,9 @@
                         </div>
                     )}
 
-                    {/* Modals */}
-                    {familyModalOpen && (
-                        <FamilySetupModal 
-                            primaryStudent={selectedFamilyStudent}
-                            allStudents={students}
-                            globalBaseFee={settings.globalBaseFee}
-                            onClose={() => setFamilyModalOpen(false)}
-                        />
-                    )}
-                    {paymentModalOpen && <GroupPaymentModal context={paymentGroupData} onClose={() => setPaymentModalOpen(false)} />}
+                    {familyModalOpen && <FamilySetupModal primaryStudent={selectedFamilyStudent} allStudents={students} globalBaseFee={settings.globalBaseFee} onClose={() => setFamilyModalOpen(false)} showAlert={showAlert}/>}
+                    {paymentModalOpen && <GroupPaymentModal context={paymentGroupData} onClose={() => setPaymentModalOpen(false)} showAlert={showAlert}/>}
+                    {extraFeeModalOpen && <ExtraFeeModal student={extraFeeStudentData} settings={settings} onClose={() => setExtraFeeModalOpen(false)} showAlert={showAlert}/>}
                     {profileModalOpen && <StudentProfileModal student={selectedProfile} onClose={() => setProfileModalOpen(false)} />}
                 </div>
             );
@@ -482,7 +490,7 @@
             const prof = student.profile || {};
             
             return (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[80] p-4">
                     <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden">
                         <div className="bg-blue-600 px-6 py-4 flex justify-between items-center text-white">
                             <h3 className="text-lg font-bold flex items-center"><Icons.UserCircle /> Student Profile</h3>
@@ -498,7 +506,6 @@
                                     <p className="text-sm font-medium text-blue-600">Class: {student.studentClass} | {student.gender === 'M' ? 'Male' : 'Female'}</p>
                                 </div>
                             </div>
-                            
                             <div className="grid grid-cols-2 gap-y-4 gap-x-6 text-sm">
                                 <div><span className="block text-gray-500 font-medium text-xs">Guardian / Father</span><span className="font-bold text-gray-800">{student.guardian || '-'}</span></div>
                                 <div><span className="block text-gray-500 font-medium text-xs">Mobile Number</span><span className="font-bold text-gray-800">{student.phone || '-'}</span></div>
@@ -519,18 +526,16 @@
         };
 
         // --- EXPANDED FAMILY / GROUP SETUP MODAL ---
-        const FamilySetupModal = ({ primaryStudent, allStudents, globalBaseFee, onClose }) => {
+        const FamilySetupModal = ({ primaryStudent, allStudents, globalBaseFee, onClose, showAlert }) => {
             const [members, setMembers] = useState([]);
             const [searchClass, setSearchClass] = useState('');
             const [searchName, setSearchName] = useState('');
             
-            // Shared Group Details
             const [groupFee, setGroupFee] = useState('');
             const [guardian, setGuardian] = useState('');
             const [phone, setPhone] = useState('');
             const [pendingArrears, setPendingArrears] = useState('');
             
-            // Primary Student Details (Expanded to match CSV fields)
             const [stName, setStName] = useState('');
             const [stClass, setStClass] = useState('');
             const [stGender, setStGender] = useState('');
@@ -541,13 +546,15 @@
             const [stAdmDate, setStAdmDate] = useState('');
             const [stSamasthaId, setStSamasthaId] = useState('');
 
+            // Confirmation States
+            const [conflictStudent, setConflictStudent] = useState(null);
+            const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+
             useEffect(() => {
                 const grp = allStudents.filter(s => s.groupId === primaryStudent.groupId);
                 setMembers(grp);
-                setGroupFee(grp[0]?.groupFee || '');
-                setGuardian(grp[0]?.guardian || '');
-                setPhone(grp[0]?.phone || '');
-                setPendingArrears(grp[0]?.pendingArrears || 0);
+                setGroupFee(grp[0]?.groupFee || ''); setGuardian(grp[0]?.guardian || '');
+                setPhone(grp[0]?.phone || ''); setPendingArrears(grp[0]?.pendingArrears || 0);
                 
                 const p = grp.find(s => s.id === primaryStudent.id);
                 if(p) {
@@ -558,17 +565,25 @@
                 }
             }, [primaryStudent, allStudents]);
 
-            const handleAddSibling = (studentToAdd) => {
+            const handleAddSiblingAttempt = (studentToAdd) => {
                 if (members.find(m => m.id === studentToAdd.id)) return;
                 if (studentToAdd.phone && studentToAdd.phone !== phone && phone !== '') {
-                    const keepPrimary = window.confirm(`Conflict!\nPrimary Phone: ${phone}\nSibling Phone: ${studentToAdd.phone}\n\nClick OK to keep Primary Phone.\nClick Cancel to use Sibling Phone.`);
-                    if (!keepPrimary) { setPhone(studentToAdd.phone); setGuardian(studentToAdd.guardian); }
+                    setConflictStudent(studentToAdd); // Open CustomConfirm
+                } else {
+                    proceedAddSibling(studentToAdd, true);
+                }
+            };
+
+            const proceedAddSibling = (studentToAdd, keepPrimary) => {
+                if (!keepPrimary) {
+                    setPhone(studentToAdd.phone || ''); setGuardian(studentToAdd.guardian || '');
                 } else if (!phone) {
                     setPhone(studentToAdd.phone || ''); setGuardian(studentToAdd.guardian || '');
                 }
                 setPendingArrears(prev => parseInt(prev || 0) + parseInt(studentToAdd.pendingArrears || 0));
-                setMembers([...members, studentToAdd]);
+                setMembers(prev => [...prev, studentToAdd]);
                 setSearchName('');
+                setConflictStudent(null);
             };
 
             const removeMember = (id) => {
@@ -585,14 +600,12 @@
                 const finalFee = groupFee ? parseInt(groupFee) : null;
                 const finalArrears = parseInt(pendingArrears || 0);
 
-                // Save Profile details for the primary student being edited
                 const primaryRef = db.collection('students').doc(primaryStudent.id);
                 batch.update(primaryRef, { 
                     name: stName.toUpperCase(), studentClass: stClass, gender: stGender,
                     profile: { dob: stDob, address: stAddress, adhaar: stAdhaar, admNo: stAdmNo, admDate: stAdmDate, samasthaId: stSamasthaId }
                 });
 
-                // Update shared details for ALL group members
                 members.forEach(m => {
                     const docRef = db.collection('students').doc(m.id);
                     batch.update(docRef, {
@@ -601,16 +614,19 @@
                     });
                 });
 
-                // Ungroup removed members
                 const originalMembers = allStudents.filter(s => s.groupId === primaryStudent.groupId);
                 originalMembers.forEach(om => {
                     if (!members.find(m => m.id === om.id)) {
-                        const soloDocRef = db.collection('students').doc(om.id);
-                        batch.update(soloDocRef, { groupId: om.id, groupFee: null }); 
+                        batch.update(db.collection('students').doc(om.id), { groupId: om.id, groupFee: null }); 
                     }
                 });
 
                 await batch.commit();
+                onClose();
+            };
+
+            const executeDelete = async () => {
+                await db.collection('students').doc(primaryStudent.id).delete();
                 onClose();
             };
 
@@ -623,7 +639,7 @@
             const calculateDefaultFee = () => members.length * globalBaseFee;
 
             return (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-2 sm:p-4">
                     <div className="bg-gray-100 rounded-lg shadow-2xl max-w-5xl w-full flex flex-col h-[95vh] md:h-[90vh]">
                         <div className="bg-yellow-600 px-6 py-4 flex justify-between items-center text-white shrink-0 shadow-sm z-10">
                             <h3 className="text-lg font-bold flex items-center"><Icons.Link /> Add / Edit Student & Setup Family</h3>
@@ -631,8 +647,6 @@
                         </div>
                         
                         <div className="flex-1 overflow-y-auto p-4 flex flex-col lg:flex-row gap-4">
-                            
-                            {/* LEFT PANEL: Student Detailed Form */}
                             <div className="flex-1 lg:w-3/5 space-y-4">
                                 <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-200">
                                     <h4 className="font-bold text-gray-800 mb-4 border-b pb-2">1. Student Profile Details</h4>
@@ -642,9 +656,9 @@
                                         <div><label className="text-xs font-bold text-gray-500 mb-1 block">Gender *</label><select className="w-full p-2.5 border rounded bg-white focus:ring-2 focus:ring-blue-400 outline-none" value={stGender} onChange={e => setStGender(e.target.value)}><option value="M">Male</option><option value="F">Female</option></select></div>
                                         
                                         <div><label className="text-xs font-bold text-gray-500 mb-1 block">Admission No.</label><input type="text" className="w-full p-2 border rounded outline-none" value={stAdmNo} onChange={e => setStAdmNo(e.target.value)} /></div>
-                                        <div><label className="text-xs font-bold text-gray-500 mb-1 block">Date of Admission</label><input type="text" placeholder="DD-MM-YYYY" className="w-full p-2 border rounded outline-none" value={stAdmDate} onChange={e => setStAdmDate(e.target.value)} /></div>
+                                        <div><label className="text-xs font-bold text-gray-500 mb-1 block">Date of Admission</label><input type="date" className="w-full p-2 border rounded outline-none text-sm" value={stAdmDate} onChange={e => setStAdmDate(e.target.value)} /></div>
                                         
-                                        <div><label className="text-xs font-bold text-gray-500 mb-1 block">Date of Birth</label><input type="text" placeholder="DD-MM-YYYY" className="w-full p-2 border rounded outline-none" value={stDob} onChange={e => setStDob(e.target.value)} /></div>
+                                        <div><label className="text-xs font-bold text-gray-500 mb-1 block">Date of Birth</label><input type="date" className="w-full p-2 border rounded outline-none text-sm" value={stDob} onChange={e => setStDob(e.target.value)} /></div>
                                         <div><label className="text-xs font-bold text-gray-500 mb-1 block">Aadhaar No.</label><input type="text" className="w-full p-2 border rounded outline-none" value={stAdhaar} onChange={e => setStAdhaar(e.target.value)} /></div>
                                         
                                         <div className="sm:col-span-2"><label className="text-xs font-bold text-gray-500 mb-1 block">Permanent Address</label><textarea rows="2" className="w-full p-2 border rounded outline-none" value={stAddress} onChange={e => setStAddress(e.target.value)}></textarea></div>
@@ -653,13 +667,11 @@
                                 </div>
                             </div>
 
-                            {/* RIGHT PANEL: Grouping & Finance */}
                             <div className="flex-1 lg:w-2/5 flex flex-col space-y-4">
-                                
                                 <div className="bg-white p-5 rounded-lg shadow-sm border border-yellow-300">
                                     <h4 className="font-bold text-yellow-800 mb-4 border-b border-yellow-200 pb-2">2. Shared Family Setup (Finance)</h4>
                                     <div className="space-y-4">
-                                        <div><label className="block text-xs font-bold text-gray-500 mb-1">Guardian / Father Name (Shared)</label><input type="text" className="w-full p-2.5 border border-gray-300 rounded uppercase focus:ring-2 focus:ring-yellow-400 outline-none font-bold" value={guardian} onChange={e => setGuardian(e.target.value)} /></div>
+                                        <div><label className="block text-xs font-bold text-gray-500 mb-1">Guardian Name (Shared)</label><input type="text" className="w-full p-2.5 border border-gray-300 rounded uppercase focus:ring-2 focus:ring-yellow-400 outline-none font-bold" value={guardian} onChange={e => setGuardian(e.target.value)} /></div>
                                         <div><label className="block text-xs font-bold text-gray-500 mb-1">Mobile No. (Acts as Group ID)</label><input type="tel" className="w-full p-2.5 border border-gray-300 rounded font-bold focus:ring-2 focus:ring-yellow-400 outline-none" value={phone} onChange={e => setPhone(e.target.value)} /></div>
                                         <div className="grid grid-cols-2 gap-3">
                                             <div>
@@ -690,7 +702,7 @@
                                                 searchResults.map(s => (
                                                     <div key={s.id} className="flex justify-between items-center p-2 border-b hover:bg-green-100">
                                                         <span className="text-xs font-bold truncate max-w-[150px]">{s.name}</span>
-                                                        <button type="button" onClick={() => handleAddSibling(s)} className="text-[10px] font-bold bg-green-600 text-white px-2 py-1 rounded shadow-sm hover:bg-green-700">ADD</button>
+                                                        <button type="button" onClick={() => handleAddSiblingAttempt(s)} className="text-[10px] font-bold bg-green-600 text-white px-2 py-1 rounded shadow-sm hover:bg-green-700">ADD</button>
                                                     </div>
                                                 ))
                                             }
@@ -704,43 +716,50 @@
                                                 {m.id !== primaryStudent.id && <button type="button" onClick={() => removeMember(m.id)} className="text-red-500 hover:text-red-700 p-1"><Icons.Close /></button>}
                                             </div>
                                         ))}
-                                        {members.length > 1 && <p className="text-[10px] text-gray-400 text-center mt-2 font-medium">All students listed above share the same Finance Setup.</p>}
                                     </div>
                                 </div>
-
                             </div>
                         </div>
 
-                        {/* Footer Actions */}
                         <div className="bg-white px-6 py-4 border-t flex justify-between items-center shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] rounded-b-lg">
-                            <button type="button" onClick={async () => {
-                                if(window.confirm("Permanently delete this student record? This cannot be undone.")) {
-                                    await db.collection('students').doc(primaryStudent.id).delete();
-                                    onClose();
-                                }
-                            }} className="text-red-600 font-bold text-sm hover:underline">Delete Record</button>
-                            
+                            <button type="button" onClick={() => setConfirmDeleteOpen(true)} className="text-red-600 font-bold text-sm hover:underline">Delete Record</button>
                             <div className="space-x-3">
                                 <button type="button" onClick={onClose} className="px-5 py-2.5 border border-gray-300 rounded-md hover:bg-gray-50 font-bold text-gray-700 transition-colors">Cancel</button>
                                 <button type="button" onClick={handleSave} className="px-8 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-yellow-950 rounded-md font-extrabold shadow-md transition-colors">Save All Details</button>
                             </div>
                         </div>
                     </div>
+
+                    {/* Nested Confirms */}
+                    <CustomConfirm 
+                        isOpen={!!conflictStudent} 
+                        title="Conflict Detected" 
+                        message={`Primary Phone: ${phone}\nSibling Phone: ${conflictStudent?.phone}\n\nDo you want to overwrite and keep the Primary Phone for all members?`} 
+                        confirmText="Keep Primary" onConfirm={() => proceedAddSibling(conflictStudent, true)} 
+                        onCancel={() => proceedAddSibling(conflictStudent, false)} 
+                        type="info"
+                    />
+                    <CustomConfirm 
+                        isOpen={confirmDeleteOpen} title="Delete Student" 
+                        message="Permanently delete this student record? All payment history will be lost. This cannot be undone." 
+                        confirmText="Yes, Delete" onConfirm={executeDelete} onCancel={() => setConfirmDeleteOpen(false)} 
+                    />
                 </div>
             );
         };
 
-        // --- GROUP PAYMENT MODAL ---
-        const GroupPaymentModal = ({ context, onClose }) => {
+        // --- GROUP PAYMENT MODAL (Added Date Field) ---
+        const GroupPaymentModal = ({ context, onClose, showAlert }) => {
             const { members, month, groupFee, existingPayment } = context;
             const [amount, setAmount] = useState(existingPayment ? existingPayment.amount : groupFee);
             const [receipt, setReceipt] = useState(existingPayment ? (existingPayment.receipt || '') : '');
+            const [payDate, setPayDate] = useState(existingPayment?.date || new Date().toISOString().split('T')[0]);
             const [confirmDel, setConfirmDel] = useState(false);
 
             const handleSave = async (e) => {
                 e.preventDefault();
                 const paidAmount = parseInt(amount);
-                if (isNaN(paidAmount) || paidAmount <= 0) return alert("Valid amount required");
+                if (isNaN(paidAmount) || paidAmount <= 0) return showAlert("Valid amount is required", "Invalid Amount");
 
                 let arrearsAdded = 0; let status = 'FULL';
                 if (paidAmount < groupFee) { status = 'PARTIAL'; arrearsAdded = groupFee - paidAmount; } 
@@ -752,15 +771,14 @@
                 const newArrears = Math.max(0, currentArrears + arrearsAdded);
 
                 const paymentData = {
-                    amount: paidAmount, status: status, receipt: receipt,
+                    amount: paidAmount, status: status, receipt: receipt, date: payDate,
                     timestamp: new Date().toISOString(), arrearsAdded: Math.max(0, arrearsAdded),
                     isSharedFamilyPayment: members.length > 1, groupId: members[0].groupId
                 };
 
                 const batch = db.batch();
                 members.forEach(m => {
-                    const docRef = db.collection('students').doc(m.id);
-                    batch.update(docRef, { [`payments.${month}`]: paymentData, pendingArrears: newArrears });
+                    batch.update(db.collection('students').doc(m.id), { [`payments.${month}`]: paymentData, pendingArrears: newArrears });
                 });
                 await batch.commit();
                 onClose();
@@ -770,60 +788,201 @@
                 const arrearsToRevert = existingPayment?.arrearsAdded || 0;
                 const batch = db.batch();
                 members.forEach(m => {
-                    const docRef = db.collection('students').doc(m.id);
-                    batch.update(docRef, { [`payments.${month}`]: firebase.firestore.FieldValue.delete(), pendingArrears: firebase.firestore.FieldValue.increment(arrearsToRevert) });
+                    batch.update(db.collection('students').doc(m.id), { [`payments.${month}`]: firebase.firestore.FieldValue.delete(), pendingArrears: firebase.firestore.FieldValue.increment(arrearsToRevert) });
                 });
                 await batch.commit();
                 onClose();
             };
 
             return (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[80] p-4">
                     <div className="bg-white rounded-lg shadow-xl max-w-md w-full overflow-hidden">
-                        <div className="bg-green-600 px-6 py-4 flex justify-between items-center text-white"><h3 className="text-lg font-bold">Payment - {month}</h3><button onClick={onClose}><Icons.Close /></button></div>
+                        <div className="bg-green-600 px-6 py-4 flex justify-between items-center text-white"><h3 className="text-lg font-bold">Monthly Fee - {month}</h3><button onClick={onClose}><Icons.Close /></button></div>
                         <form onSubmit={handleSave} className="p-6 space-y-4">
                             <div className="bg-gray-50 p-3 rounded border text-sm text-gray-700 mb-4">
                                 <p className="font-bold border-b pb-1 mb-2">Paying for {members.length} Student(s):</p>
                                 <div className="space-y-1 mb-2 max-h-20 overflow-y-auto">{members.map(m => <div key={m.id} className="text-xs font-bold">• {m.name}</div>)}</div>
-                                <p className="text-lg font-bold text-green-800 mt-2 border-t pt-2">Due: ₹{groupFee}</p>
+                                <p className="text-lg font-bold text-green-800 mt-2 border-t pt-2 flex justify-between"><span>Due Amount:</span> <span>₹{groupFee}</span></p>
                             </div>
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-1">Paid (₹)</label>
-                                <input type="number" required min="1" className="w-full px-4 py-3 border rounded-md text-2xl font-bold" value={amount} onChange={e => setAmount(e.target.value)} />
-                            </div>
-                            <div><label className="block text-sm font-bold">Receipt No</label><input type="text" className="w-full px-4 py-2 border rounded-md uppercase font-bold" value={receipt} onChange={e => setReceipt(e.target.value)} /></div>
+                            
+                            <div><label className="block text-sm font-bold text-gray-700 mb-1">Date of Payment</label><input type="date" required className="w-full px-4 py-2 border rounded-md font-bold text-gray-800 outline-none focus:ring-2 focus:ring-green-500" value={payDate} onChange={e => setPayDate(e.target.value)} /></div>
+                            <div><label className="block text-sm font-bold text-gray-700 mb-1">Amount Paid (₹)</label><input type="number" required min="1" className="w-full px-4 py-3 border rounded-md text-2xl font-bold outline-none focus:ring-2 focus:ring-green-500" value={amount} onChange={e => setAmount(e.target.value)} /></div>
+                            <div><label className="block text-sm font-bold text-gray-700 mb-1">Receipt No (Optional)</label><input type="text" className="w-full px-4 py-2 border rounded-md uppercase font-bold outline-none focus:ring-2 focus:ring-green-500" value={receipt} onChange={e => setReceipt(e.target.value)} /></div>
+                            
                             <div className="pt-4 flex justify-between mt-6">
-                                {existingPayment ? <button type="button" onClick={() => setConfirmDel(true)} className="text-red-600 font-bold px-3 py-2">Delete Record</button> : <div></div>}
-                                <div className="space-x-3"><button type="button" onClick={onClose} className="px-4 py-2 font-bold text-gray-600 border rounded">Cancel</button><button type="submit" className="px-6 py-2 bg-green-600 text-white rounded-md font-bold shadow-md">Save</button></div>
+                                {existingPayment ? <button type="button" onClick={() => setConfirmDel(true)} className="text-red-600 font-bold px-3 py-2 border border-transparent hover:border-red-200 rounded">Delete Record</button> : <div></div>}
+                                <div className="space-x-3"><button type="button" onClick={onClose} className="px-4 py-2 font-bold text-gray-600 border rounded hover:bg-gray-50">Cancel</button><button type="submit" className="px-6 py-2 bg-green-600 text-white rounded-md font-bold shadow-md hover:bg-green-700">Save</button></div>
                             </div>
                         </form>
                     </div>
-                    <CustomConfirm isOpen={confirmDel} message="Delete payment?" confirmText="Delete" onConfirm={handleDelete} onCancel={() => setConfirmDel(false)} />
+                    <CustomConfirm isOpen={confirmDel} title="Delete Payment" message="Are you sure you want to delete this payment record? This will adjust arrears automatically." confirmText="Delete" onConfirm={handleDelete} onCancel={() => setConfirmDel(false)} />
                 </div>
             );
         };
 
-        // --- SETTINGS TAB ---
-        const SettingsTab = ({ settings }) => {
-            const [baseFee, setBaseFee] = useState(settings.globalBaseFee || '');
+        // --- EXTRA FEE MODAL (NEW) ---
+        const ExtraFeeModal = ({ student, settings, onClose, showAlert }) => {
+            if (!student) return null;
+            const applicableFees = settings.extraFees?.filter(f => f.applyTo === 'ALL' || f.applyTo === student.studentClass) || [];
+            
+            const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
+            const [receipt, setReceipt] = useState('');
+            const [payingFeeId, setPayingFeeId] = useState(null);
+            const [amountInput, setAmountInput] = useState('');
+
+            const handlePay = async (feeId, expectedAmount) => {
+                if (!amountInput || parseInt(amountInput) <= 0) return showAlert("Enter a valid amount.", "Error");
+                const paymentObj = { amount: parseInt(amountInput), date: payDate, receipt: receipt, timestamp: new Date().toISOString() };
+                await db.collection('students').doc(student.id).update({ [`extraFeePayments.${feeId}`]: paymentObj });
+                setPayingFeeId(null); setReceipt(''); setAmountInput('');
+            };
+
+            const handleDelete = async (feeId) => {
+                await db.collection('students').doc(student.id).update({ [`extraFeePayments.${feeId}`]: firebase.firestore.FieldValue.delete() });
+            };
+
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[80] p-4">
+                    <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden">
+                        <div className="bg-purple-600 px-6 py-4 flex justify-between items-center text-white">
+                            <h3 className="text-lg font-bold">Extra Fees - {student.name}</h3><button onClick={onClose}><Icons.Close /></button>
+                        </div>
+                        <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+                            {applicableFees.length === 0 ? <p className="text-gray-500 text-center py-4">No extra fees configured for Class {student.studentClass}.</p> : 
+                                applicableFees.map(fee => {
+                                    const payment = student.extraFeePayments?.[fee.id];
+                                    const isPaying = payingFeeId === fee.id;
+                                    return (
+                                        <div key={fee.id} className="border border-purple-200 bg-purple-50 p-4 rounded-lg">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <span className="font-bold text-purple-900">{fee.name}</span>
+                                                <span className="font-bold bg-white px-2 py-1 rounded text-sm shadow-sm">₹{fee.amount}</span>
+                                            </div>
+                                            
+                                            {payment ? (
+                                                <div className="bg-white p-3 rounded border border-green-200 mt-2 text-sm">
+                                                    <div className="flex justify-between items-center text-green-700 font-bold mb-1">
+                                                        <span className="flex items-center"><Icons.Check /> Paid Successfully</span>
+                                                        <button onClick={() => handleDelete(fee.id)} className="text-red-500 text-[10px] underline">Delete</button>
+                                                    </div>
+                                                    <p className="text-gray-600">Amount Paid: ₹{payment.amount} | Date: {payment.date}</p>
+                                                    {payment.receipt && <p className="text-gray-600">Receipt: {payment.receipt}</p>}
+                                                </div>
+                                            ) : isPaying ? (
+                                                <div className="bg-white p-3 rounded shadow-inner mt-2 space-y-3 border">
+                                                    <div className="grid grid-cols-2 gap-2 text-sm">
+                                                        <div><label className="text-xs font-bold text-gray-500">Date</label><input type="date" className="w-full border p-1.5 rounded" value={payDate} onChange={e => setPayDate(e.target.value)} /></div>
+                                                        <div><label className="text-xs font-bold text-gray-500">Receipt No</label><input type="text" className="w-full border p-1.5 rounded uppercase" value={receipt} onChange={e => setReceipt(e.target.value)} /></div>
+                                                    </div>
+                                                    <div><label className="text-xs font-bold text-gray-500">Paying Amount</label><input type="number" className="w-full border p-2 rounded font-bold text-lg" value={amountInput} onChange={e => setAmountInput(e.target.value)} /></div>
+                                                    <div className="flex justify-end space-x-2 pt-2 border-t">
+                                                        <button onClick={() => setPayingFeeId(null)} className="px-3 py-1 bg-gray-200 rounded text-xs font-bold">Cancel</button>
+                                                        <button onClick={() => handlePay(fee.id, fee.amount)} className="px-4 py-1 bg-purple-600 text-white rounded text-xs font-bold shadow">Save Payment</button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="mt-3 flex justify-end">
+                                                    <button onClick={() => { setPayingFeeId(fee.id); setAmountInput(fee.amount); setReceipt(''); setPayDate(new Date().toISOString().split('T')[0]); }} className="bg-purple-600 text-white px-4 py-1.5 rounded text-sm font-bold shadow hover:bg-purple-700 transition">Pay Now</button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })
+                            }
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- SETTINGS TAB (Added Academic Year & Extra Fees Master) ---
+        const SettingsTab = ({ settings, ALL_MONTHS_BASE, showAlert }) => {
+            const [baseFee, setBaseFee] = useState(settings.globalBaseFee || 500);
+            const [startMonth, setStartMonth] = useState(settings.academicStartMonth || 'Jun');
+            const [endMonth, setEndMonth] = useState(settings.academicEndMonth || 'May');
+            const [extraFees, setExtraFees] = useState(settings.extraFees || []);
             const [saving, setSaving] = useState(false);
+
+            // Temp state for new extra fee
+            const [newFeeName, setNewFeeName] = useState('');
+            const [newFeeAmount, setNewFeeAmount] = useState('');
+            const [newFeeClass, setNewFeeClass] = useState('ALL');
+
+            const addExtraFee = () => {
+                if(!newFeeName || !newFeeAmount) return showAlert("Please enter Fee Name and Amount.", "Missing Info");
+                const newFee = { id: 'FEE_' + Date.now(), name: newFeeName.toUpperCase(), amount: parseInt(newFeeAmount), applyTo: newFeeClass };
+                setExtraFees([...extraFees, newFee]);
+                setNewFeeName(''); setNewFeeAmount(''); setNewFeeClass('ALL');
+            };
+            const removeExtraFee = (id) => setExtraFees(extraFees.filter(f => f.id !== id));
 
             const handleSave = async (e) => {
                 e.preventDefault();
                 setSaving(true);
-                await db.collection('settings').doc('global').set({ globalBaseFee: parseInt(baseFee) }, { merge: true });
+                await db.collection('settings').doc('global').set({ 
+                    globalBaseFee: parseInt(baseFee), 
+                    academicStartMonth: startMonth, 
+                    academicEndMonth: endMonth,
+                    extraFees: extraFees
+                }, { merge: true });
                 setSaving(false);
-                alert("Settings updated!");
+                showAlert("Settings updated successfully! The table will now reflect these changes.", "Success");
             };
 
             return (
-                <div className="max-w-2xl mx-auto mt-8">
-                    <div className="bg-white p-8 rounded-xl shadow-md border border-gray-100">
-                        <div className="flex items-center mb-6 border-b pb-4"><div className="p-3 bg-green-100 text-green-700 rounded-lg mr-4"><Icons.Settings /></div><div><h2 className="text-xl font-bold">Global Configuration</h2></div></div>
-                        <form onSubmit={handleSave}>
-                            <div className="mb-6"><label className="block text-sm font-bold mb-2">Default Base Fee (₹)</label><input type="number" required min="0" className="w-full md:w-1/2 px-4 py-3 border rounded-md text-lg font-bold" value={baseFee} onChange={e => setBaseFee(e.target.value)} /></div>
-                            <button type="submit" disabled={saving} className="px-8 py-3 bg-green-600 hover:bg-green-700 rounded-md font-bold text-white transition-all shadow-md">Save Config</button>
+                <div className="max-w-4xl mx-auto mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* General Settings */}
+                    <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100 flex flex-col">
+                        <div className="flex items-center mb-6 border-b pb-4"><div className="p-3 bg-green-100 text-green-700 rounded-lg mr-4"><Icons.Settings /></div><div><h2 className="text-xl font-bold">General Configuration</h2></div></div>
+                        <form onSubmit={handleSave} className="flex-1 flex flex-col">
+                            <div className="space-y-5 flex-1">
+                                <div><label className="block text-sm font-bold mb-1 text-gray-700">Default Base Fee (₹)</label><input type="number" required min="0" className="w-full px-4 py-2 border rounded-md text-lg font-bold focus:ring-green-500 outline-none" value={baseFee} onChange={e => setBaseFee(e.target.value)} /></div>
+                                
+                                <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg">
+                                    <label className="block text-sm font-bold mb-3 text-blue-900">Academic Year Months</label>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-xs text-blue-700 font-bold">Starts From</label>
+                                            <select className="w-full p-2 border rounded bg-white outline-none" value={startMonth} onChange={e => setStartMonth(e.target.value)}>{ALL_MONTHS_BASE.map(m => <option key={m} value={m}>{m}</option>)}</select>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs text-blue-700 font-bold">Ends In</label>
+                                            <select className="w-full p-2 border rounded bg-white outline-none" value={endMonth} onChange={e => setEndMonth(e.target.value)}>{ALL_MONTHS_BASE.map(m => <option key={m} value={m}>{m}</option>)}</select>
+                                        </div>
+                                    </div>
+                                    <p className="text-[10px] mt-2 text-blue-600">Table columns will be arranged exactly in this order.</p>
+                                </div>
+                            </div>
+                            <button type="submit" disabled={saving} className="mt-6 w-full py-3 bg-green-600 hover:bg-green-700 rounded-md font-bold text-white transition-all shadow-md">Save All Settings</button>
                         </form>
+                    </div>
+
+                    {/* Extra Fees Master */}
+                    <div className="bg-white p-6 rounded-xl shadow-md border border-purple-100 flex flex-col">
+                        <div className="flex items-center mb-6 border-b border-purple-100 pb-4"><div className="p-3 bg-purple-100 text-purple-700 rounded-lg mr-4"><Icons.PlusCircle /></div><div><h2 className="text-xl font-bold text-purple-900">Extra Fees Master</h2><p className="text-xs text-purple-600">Exam fee, Admission fee etc.</p></div></div>
+                        
+                        <div className="bg-purple-50 p-4 rounded-lg border border-purple-200 mb-4">
+                            <h4 className="text-xs font-bold text-purple-800 mb-2">Create New Extra Fee</h4>
+                            <div className="space-y-2">
+                                <input type="text" placeholder="Fee Name (e.g. EXAM FEE)" className="w-full p-2 text-sm border rounded uppercase outline-none" value={newFeeName} onChange={e => setNewFeeName(e.target.value)} />
+                                <div className="flex space-x-2">
+                                    <input type="number" placeholder="Amount (₹)" className="w-1/3 p-2 text-sm border rounded outline-none font-bold" value={newFeeAmount} onChange={e => setNewFeeAmount(e.target.value)} />
+                                    <select className="w-1/3 p-2 text-sm border rounded outline-none" value={newFeeClass} onChange={e => setNewFeeClass(e.target.value)}><option value="ALL">All Classes</option>{CLASSES.map(c => <option key={c} value={c}>Class {c}</option>)}</select>
+                                    <button onClick={addExtraFee} type="button" className="w-1/3 bg-purple-600 text-white text-sm font-bold rounded shadow hover:bg-purple-700">Add Fee</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto space-y-2">
+                            {extraFees.length === 0 ? <p className="text-sm text-gray-500 text-center py-4">No Extra Fees configured.</p> : 
+                                extraFees.map(fee => (
+                                    <div key={fee.id} className="flex justify-between items-center bg-white border border-gray-200 p-3 rounded shadow-sm">
+                                        <div><div className="font-bold text-sm text-gray-800">{fee.name}</div><div className="text-[10px] font-bold text-purple-600 bg-purple-100 px-1 inline-block rounded mt-1">Applies to: {fee.applyTo === 'ALL' ? 'ALL CLASSES' : `Class ${fee.applyTo}`}</div></div>
+                                        <div className="flex items-center space-x-3"><span className="font-bold text-lg text-gray-700">₹{fee.amount}</span><button onClick={() => removeExtraFee(fee.id)} className="text-red-500 hover:text-red-700 p-1"><Icons.Trash /></button></div>
+                                    </div>
+                                ))
+                            }
+                        </div>
                     </div>
                 </div>
             );
