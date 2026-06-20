@@ -61,8 +61,8 @@
             Trash: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>,
             Check: () => <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>,
             Warning: () => <svg className="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>,
-            Male: () => <span className="text-blue-500 font-bold">M</span>,
-            Female: () => <span className="text-pink-500 font-bold">F</span>,
+            Male: () => <span className="text-blue-600 font-bold ml-1 text-xs px-1.5 py-0.5 bg-blue-50 border border-blue-200 rounded">(M)</span>,
+            Female: () => <span className="text-pink-600 font-bold ml-1 text-xs px-1.5 py-0.5 bg-pink-50 border border-pink-200 rounded">(F)</span>,
             Close: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>,
             Settings: () => <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>,
             Users: () => <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>,
@@ -136,9 +136,13 @@
         // --- STUDENTS TAB COMPONENT ---
         const StudentTab = ({ students, settings }) => {
             const [search, setSearch] = useState('');
+            
+            // 4-Stage Filters
             const [classFilter, setClassFilter] = useState('');
-            const [arrearsFilter, setArrearsFilter] = useState(false);
             const [sortOption, setSortOption] = useState('CLASS_DESC');
+            const [genderSort, setGenderSort] = useState('MIXED');
+            const [statusFilter, setStatusFilter] = useState('ALL');
+
             const [perPage, setPerPage] = useState(30);
             const [currentPage, setCurrentPage] = useState(1);
             
@@ -156,12 +160,14 @@
             const [uploading, setUploading] = useState(false);
             const [selectedUploadClass, setSelectedUploadClass] = useState('');
 
-            // Fetch grouped students dynamically
+            // Helper to get grouped students
             const getGroupMembers = (groupId) => students.filter(s => s.groupId === groupId);
 
+            // Complex Filtering & Sorting Logic
             const filteredStudents = useMemo(() => {
                 let result = [...students];
 
+                // Search
                 if (search) {
                     const q = search.toLowerCase();
                     result = result.filter(s => 
@@ -171,10 +177,30 @@
                         (s.payments && Object.values(s.payments).some(p => p.receipt?.toLowerCase().includes(q)))
                     );
                 }
-                if (classFilter) result = result.filter(s => s.studentClass === classFilter);
-                if (arrearsFilter) result = result.filter(s => (s.pendingArrears || 0) > 0);
 
+                // 1. Class Filter
+                if (classFilter) result = result.filter(s => s.studentClass === classFilter);
+
+                // 4. Status Filter
+                if (statusFilter === 'ARREARS') {
+                    result = result.filter(s => (s.pendingArrears || 0) > 0);
+                } else if (statusFilter === 'GROUPED') {
+                    result = result.filter(s => getGroupMembers(s.groupId).length > 1);
+                } else if (statusFilter === 'CONCESSION') {
+                    result = result.filter(s => {
+                        const members = getGroupMembers(s.groupId);
+                        const defaultFee = members.length * settings.globalBaseFee;
+                        return s.groupFee !== null && s.groupFee !== defaultFee;
+                    });
+                }
+
+                // Apply Sorting (Gender + Name/Adm)
                 result.sort((a, b) => {
+                    // Primary Sort: Gender (If not Mixed)
+                    if (genderSort === 'BOYS_FIRST' && a.gender !== b.gender) return a.gender === 'M' ? -1 : 1;
+                    if (genderSort === 'GIRLS_FIRST' && a.gender !== b.gender) return a.gender === 'F' ? -1 : 1;
+
+                    // Secondary Sort: Sort Option
                     if (sortOption === 'CLASS_DESC') {
                         const idxA = CLASSES.indexOf(a.studentClass);
                         const idxB = CLASSES.indexOf(b.studentClass);
@@ -182,22 +208,24 @@
                         return (a.name || '').localeCompare(b.name || '');
                     }
                     if (sortOption === 'NAME_ASC') return (a.name || '').localeCompare(b.name || '');
-                    if (sortOption === 'GENDER_MALE') return (a.gender === 'M' ? -1 : 1);
+                    if (sortOption === 'NAME_DESC') return (b.name || '').localeCompare(a.name || '');
+                    if (sortOption === 'ADM_NO') {
+                        const admA = parseInt(a.profile?.admNo) || 999999;
+                        const admB = parseInt(b.profile?.admNo) || 999999;
+                        return admA - admB;
+                    }
                     return 0;
                 });
 
                 return result;
-            }, [students, search, classFilter, arrearsFilter, sortOption]);
+            }, [students, search, classFilter, statusFilter, sortOption, genderSort, settings.globalBaseFee]);
 
             const totalPages = Math.ceil(filteredStudents.length / perPage);
             const paginatedStudents = filteredStudents.slice((currentPage - 1) * perPage, currentPage * perPage);
 
-            // --- CSV UPLOAD LOGIC (Optimized for Samastha Format) ---
+            // --- CSV UPLOAD LOGIC (No Auto-Grouping) ---
             const triggerFileUpload = () => {
-                if (!selectedUploadClass) {
-                    alert("Please select a Class from the dropdown before uploading the CSV file.");
-                    return;
-                }
+                if (!selectedUploadClass) return alert("Please select a Class from the dropdown before uploading the CSV file.");
                 fileInputRef.current.click();
             };
 
@@ -214,26 +242,24 @@
                             const batch = db.batch();
                             const parsedData = results.data;
                             
-                            const phoneGroups = {};
-                            
                             parsedData.forEach(row => {
-                                // Fallback mapping to catch variations in CSV headers
                                 const rawName = row['Name'] || row['Student Name'] || row['Full Name'] || '';
-                                if (!rawName) return; // Skip if no name found
+                                if (!rawName) return; 
 
                                 const rawPhone = (row['Mobile'] || row['Phone'] || '').trim();
                                 const rawGender = (row['Gender'] || '').trim().toUpperCase();
                                 
                                 const studentData = {
                                     name: rawName.trim().toUpperCase(),
-                                    studentClass: selectedUploadClass, // Assigned from UI
+                                    studentClass: selectedUploadClass,
                                     gender: rawGender.startsWith('F') ? 'F' : 'M',
                                     guardian: (row['Father'] || row['Guardian'] || '').trim().toUpperCase(),
                                     phone: rawPhone,
-                                    pendingArrears: 0, // Default to 0 for new bulk upload
+                                    pendingArrears: 0, 
                                     groupFee: null,
                                     payments: {},
-                                    // Storing extra details from Samastha CSV format
+                                    // SOLO GROUPING (Disabled Auto-Group logic)
+                                    groupId: db.collection('students').doc().id, 
                                     profile: {
                                         dob: row['DOB'] || '',
                                         address: row['Permanent Address'] || '',
@@ -243,40 +269,19 @@
                                         admDate: row['Adm. Date'] || ''
                                     }
                                 };
-
-                                if (!rawPhone) {
-                                    studentData.groupId = db.collection('students').doc().id; // Solo group
-                                    const docRef = db.collection('students').doc(studentData.groupId);
-                                    batch.set(docRef, studentData);
-                                } else {
-                                    if (!phoneGroups[rawPhone]) {
-                                        phoneGroups[rawPhone] = { 
-                                            groupId: db.collection('students').doc().id, 
-                                            students: [] 
-                                        };
-                                    }
-                                    studentData.groupId = phoneGroups[rawPhone].groupId;
-                                    phoneGroups[rawPhone].students.push(studentData);
-                                }
-                            });
-
-                            // Add grouped students to batch
-                            Object.values(phoneGroups).forEach(group => {
-                                group.students.forEach(std => {
-                                    const docRef = db.collection('students').doc(); 
-                                    batch.set(docRef, std);
-                                });
+                                const docRef = db.collection('students').doc(studentData.groupId);
+                                batch.set(docRef, studentData);
                             });
 
                             await batch.commit();
-                            alert("Bulk upload successful! Students are imported to class " + selectedUploadClass);
+                            alert("Bulk upload successful! Students are imported as solo records (No Auto-Grouping).");
                         } catch (err) {
                             console.error("Upload error:", err);
                             alert("Error uploading data. Please check your CSV format.");
                         }
                         setUploading(false);
-                        setSelectedUploadClass(''); // Reset class
-                        e.target.value = null; // reset input
+                        setSelectedUploadClass('');
+                        e.target.value = null;
                     }
                 });
             };
@@ -286,7 +291,8 @@
                 const newId = newDocRef.id;
                 await newDocRef.set({
                     name: 'NEW STUDENT', studentClass: '+2', gender: 'M', guardian: '', phone: '',
-                    groupId: newId, pendingArrears: 0, groupFee: null, payments: {}, profile: {}
+                    groupId: newId, pendingArrears: 0, groupFee: null, payments: {}, 
+                    profile: { dob:'', address:'', adhaar:'', admNo:'', samasthaId:'', admDate:'' }
                 });
                 setSelectedFamilyStudent({ id: newId, name: 'NEW STUDENT', groupId: newId });
                 setFamilyModalOpen(true);
@@ -299,120 +305,137 @@
                 setPaymentModalOpen(true);
             };
 
-            const openProfileModal = (student) => {
-                setSelectedProfile(student);
-                setProfileModalOpen(true);
-            };
-
             return (
                 <div className="flex flex-col space-y-4">
-                    {/* Top Controls */}
-                    <div className="flex flex-col xl:flex-row justify-between items-center gap-4 bg-gray-50 p-4 rounded-lg border">
-                        <div className="flex items-center space-x-2 w-full xl:w-1/4 relative">
+                    {/* Top Controls - 4 Stage Filters & Search */}
+                    <div className="flex flex-col lg:flex-row justify-between items-center gap-3 bg-gray-50 p-4 rounded-lg border">
+                        <div className="flex items-center space-x-2 w-full lg:w-1/4 relative">
                             <Icons.Search />
-                            <input type="text" placeholder="Search Name, Phone, or Receipt..." className="w-full px-3 py-2 border rounded-md focus:ring-green-500 outline-none" value={search} onChange={e => { setSearch(e.target.value); setCurrentPage(1); }} />
+                            <input type="text" placeholder="Search..." className="w-full px-3 py-1.5 border rounded focus:ring-green-500 outline-none text-sm" value={search} onChange={e => { setSearch(e.target.value); setCurrentPage(1); }} />
                         </div>
                         
-                        <div className="flex flex-wrap items-center gap-3">
-                            <select className="px-3 py-2 border rounded-md" value={classFilter} onChange={e => { setClassFilter(e.target.value); setCurrentPage(1); }}>
-                                <option value="">All Classes</option>
-                                {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+                        <div className="flex flex-wrap items-center gap-2">
+                            {/* Filter 1: Class */}
+                            <select className="px-2 py-1.5 border rounded text-sm bg-white" value={classFilter} onChange={e => { setClassFilter(e.target.value); setCurrentPage(1); }}>
+                                <option value="">Filter: All Classes</option>
+                                {CLASSES.map(c => <option key={c} value={c}>Class {c}</option>)}
                             </select>
-                            <select className="px-3 py-2 border rounded-md" value={sortOption} onChange={e => { setSortOption(e.target.value); setCurrentPage(1); }}>
-                                <option value="CLASS_DESC">Class (+2 to 1)</option>
-                                <option value="NAME_ASC">Name (A-Z)</option>
-                                <option value="GENDER_MALE">Boys First</option>
-                            </select>
-                            <label className="flex items-center space-x-2 cursor-pointer bg-white px-3 py-2 border rounded-md text-sm font-medium">
-                                <input type="checkbox" checked={arrearsFilter} onChange={e => { setArrearsFilter(e.target.checked); setCurrentPage(1); }} className="rounded text-green-600 focus:ring-green-500" />
-                                <span>Arrears Only</span>
-                            </label>
                             
-                            <div className="border-l border-gray-300 mx-2 h-8 hidden xl:block"></div>
+                            {/* Filter 2: Sort */}
+                            <select className="px-2 py-1.5 border rounded text-sm bg-white" value={sortOption} onChange={e => { setSortOption(e.target.value); setCurrentPage(1); }}>
+                                <option value="CLASS_DESC">Sort: Class (+2 to 1)</option>
+                                <option value="NAME_ASC">Sort: Name (A-Z)</option>
+                                <option value="NAME_DESC">Sort: Name (Z-A)</option>
+                                <option value="ADM_NO">Sort: Admission No.</option>
+                            </select>
 
-                            {/* CSV Upload Section with Class Selection */}
-                            <div className="flex items-center bg-blue-50 border border-blue-200 rounded-md p-1">
-                                <select className="px-2 py-1.5 bg-transparent outline-none text-sm font-bold text-blue-800" value={selectedUploadClass} onChange={e => setSelectedUploadClass(e.target.value)}>
+                            {/* Filter 3: Gender */}
+                            <select className="px-2 py-1.5 border rounded text-sm bg-white" value={genderSort} onChange={e => { setGenderSort(e.target.value); setCurrentPage(1); }}>
+                                <option value="MIXED">Gender: Mixed</option>
+                                <option value="BOYS_FIRST">Boys First</option>
+                                <option value="GIRLS_FIRST">Girls First</option>
+                            </select>
+
+                            {/* Filter 4: Special Status */}
+                            <select className="px-2 py-1.5 border rounded text-sm bg-white font-medium text-blue-700" value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setCurrentPage(1); }}>
+                                <option value="ALL">Status: All</option>
+                                <option value="CONCESSION">Concessions Only</option>
+                                <option value="GROUPED">Grouped Siblings</option>
+                                <option value="ARREARS">Pending Arrears</option>
+                            </select>
+
+                            <div className="border-l border-gray-300 mx-1 h-6 hidden xl:block"></div>
+
+                            {/* CSV Upload Section */}
+                            <div className="flex items-center bg-blue-50 border border-blue-200 rounded p-1">
+                                <select className="px-2 py-1 bg-transparent outline-none text-xs font-bold text-blue-800" value={selectedUploadClass} onChange={e => setSelectedUploadClass(e.target.value)}>
                                     <option value="">-- Target Class --</option>
                                     {CLASSES.map(c => <option key={c} value={c}>Class {c}</option>)}
                                 </select>
                                 <input type="file" accept=".csv" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
-                                <button onClick={triggerFileUpload} disabled={uploading} className="flex items-center bg-blue-700 hover:bg-blue-800 text-white px-3 py-1.5 rounded font-medium text-sm disabled:opacity-50 ml-1">
-                                    <Icons.Upload /> {uploading ? 'Wait...' : 'Bulk Upload'}
+                                <button onClick={triggerFileUpload} disabled={uploading} className="flex items-center bg-blue-700 hover:bg-blue-800 text-white px-2 py-1 rounded font-medium text-xs disabled:opacity-50 ml-1">
+                                    <Icons.Upload /> {uploading ? 'Wait...' : 'CSV Upload'}
                                 </button>
                             </div>
 
-                            <button onClick={handleAddSingle} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md font-medium text-sm transition-colors shadow-sm">
+                            <button onClick={handleAddSingle} className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded font-medium text-sm transition-colors shadow-sm">
                                 + Add Student
                             </button>
                         </div>
                     </div>
 
-                    {/* Data Table */}
+                    {/* Data Table (Optimized Layout) */}
                     <div className="table-container border rounded-lg shadow-sm bg-white">
                         <table className="min-w-full text-sm text-left whitespace-nowrap">
                             <thead className="text-xs text-gray-700 uppercase bg-gray-100 sticky top-0 z-10 shadow-sm border-b">
                                 <tr>
-                                    <th className="px-4 py-3">Sl.No</th>
-                                    <th className="px-4 py-3">Class</th>
-                                    <th className="px-4 py-3">Student Name</th>
-                                    <th className="px-2 py-3 text-center">G</th>
-                                    <th className="px-4 py-3">Guardian</th>
-                                    <th className="px-4 py-3">Phone</th>
-                                    <th className="px-4 py-3 text-center bg-yellow-50 text-yellow-800 border-x">Group / Fee Setup</th>
-                                    <th className="px-4 py-3 text-right text-red-600">Arrears</th>
-                                    {MONTHS.map(m => <th key={m} className="px-4 py-3 text-center border-l">{m}</th>)}
+                                    <th className="px-3 py-2 w-12">No</th>
+                                    <th className="px-3 py-2 w-16">Class</th>
+                                    <th className="px-3 py-2">Student Name</th>
+                                    <th className="px-3 py-2 border-r">Guardian & Contact</th>
+                                    <th className="px-3 py-2 text-center bg-yellow-50 text-yellow-800 border-r w-28">Group Setup</th>
+                                    <th className="px-3 py-2 text-right text-red-600 w-24 border-r">Arrears</th>
+                                    {MONTHS.map(m => <th key={m} className="px-2 py-2 text-center border-r w-12">{m}</th>)}
                                 </tr>
                             </thead>
                             <tbody>
                                 {paginatedStudents.length === 0 ? (
-                                    <tr><td colSpan={8 + MONTHS.length} className="text-center py-8 text-gray-500">No students found.</td></tr>
+                                    <tr><td colSpan={6 + MONTHS.length} className="text-center py-8 text-gray-500">No students match the current filters.</td></tr>
                                 ) : (
                                     paginatedStudents.map((student, idx) => {
                                         const groupMembers = getGroupMembers(student.groupId);
                                         const isGroup = groupMembers.length > 1;
                                         const actualFee = student.groupFee || (groupMembers.length * settings.globalBaseFee);
+                                        const hasConcession = student.groupFee !== null && student.groupFee !== (groupMembers.length * settings.globalBaseFee);
                                         
                                         return (
                                             <tr key={student.id} className="bg-white border-b hover:bg-green-50 transition-colors">
-                                                <td className="px-4 py-3 text-gray-500">{(currentPage - 1) * perPage + idx + 1}</td>
-                                                <td className="px-4 py-3 font-semibold">{student.studentClass}</td>
-                                                <td className="px-4 py-3 font-bold text-blue-600 hover:text-blue-800 cursor-pointer hover:underline" onClick={() => openProfileModal(student)}>
-                                                    {student.name}
+                                                <td className="px-3 py-2 text-gray-500 text-xs">{(currentPage - 1) * perPage + idx + 1}</td>
+                                                <td className="px-3 py-2 font-bold">{student.studentClass}</td>
+                                                
+                                                {/* Optimized: Name + Gender Badge */}
+                                                <td className="px-3 py-2">
+                                                    <div className="flex items-center">
+                                                        <span className="font-bold text-blue-700 hover:text-blue-900 cursor-pointer hover:underline truncate max-w-[180px]" onClick={() => openProfileModal(student)}>
+                                                            {student.name}
+                                                        </span>
+                                                        {student.gender === 'M' ? <Icons.Male/> : <Icons.Female/>}
+                                                    </div>
                                                 </td>
-                                                <td className="px-2 py-3 text-center">{student.gender === 'M' ? <Icons.Male/> : <Icons.Female/>}</td>
-                                                <td className="px-4 py-3">{student.guardian}</td>
-                                                <td className="px-4 py-3 font-medium">{student.phone}</td>
+
+                                                {/* Optimized: Guardian + Phone Combined */}
+                                                <td className="px-3 py-2 border-r">
+                                                    <div className="flex flex-col leading-tight">
+                                                        <span className="font-semibold text-gray-800 text-xs truncate max-w-[160px]">{student.guardian || '-'}</span>
+                                                        <span className="text-[11px] text-gray-500 font-medium tracking-wide mt-0.5">{student.phone || '-'}</span>
+                                                    </div>
+                                                </td>
                                                 
                                                 {/* Group / Fee Setup Column */}
-                                                <td className="px-4 py-2 border-x text-center bg-yellow-50/30">
-                                                    <button onClick={() => { setSelectedFamilyStudent(student); setFamilyModalOpen(true); }} className="w-full flex items-center justify-center px-3 py-1 bg-white border border-yellow-300 hover:bg-yellow-100 rounded text-yellow-800 font-bold shadow-sm transition-all text-xs">
+                                                <td className="px-3 py-2 border-r text-center bg-yellow-50/20">
+                                                    <button onClick={() => { setSelectedFamilyStudent(student); setFamilyModalOpen(true); }} className={`w-full flex items-center justify-center px-2 py-1 bg-white border rounded font-bold shadow-sm transition-all text-[11px] tracking-wide ${hasConcession ? 'border-yellow-400 text-yellow-900 bg-yellow-50' : 'border-gray-200 text-gray-700 hover:border-yellow-300'}`}>
                                                         {isGroup && <Icons.Link />}
                                                         ₹{actualFee} {isGroup ? `(${groupMembers.length})` : ''}
                                                     </button>
                                                 </td>
                                                 
                                                 {/* Pending Arrears */}
-                                                <td className={`px-4 py-3 text-right font-bold ${student.pendingArrears > 0 ? 'text-red-600 bg-red-50' : 'text-gray-400'}`}>
-                                                    ₹{student.pendingArrears || 0}
+                                                <td className={`px-3 py-2 text-right font-bold border-r ${student.pendingArrears > 0 ? 'text-red-600 bg-red-50/50' : 'text-gray-300'}`}>
+                                                    {student.pendingArrears > 0 ? `₹${student.pendingArrears}` : '0'}
                                                 </td>
 
                                                 {/* Months columns */}
                                                 {MONTHS.map(month => {
                                                     const payment = student.payments?.[month];
                                                     return (
-                                                        <td key={month} className="px-2 py-2 border-l cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => openPaymentModal(groupMembers, month)}>
+                                                        <td key={month} className="px-1 py-1 border-r cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => openPaymentModal(groupMembers, month)}>
                                                             <div className="flex flex-col items-center justify-center h-full">
                                                                 {!payment ? (
-                                                                    <span className="w-8 h-8 rounded border border-dashed border-gray-300 flex items-center justify-center text-gray-300 text-xs">+</span>
+                                                                    <span className="w-6 h-6 rounded border border-dashed border-gray-300 flex items-center justify-center text-gray-300 text-[10px]">+</span>
                                                                 ) : payment.status === 'FULL' ? (
-                                                                    <div className="flex flex-col items-center" title={`Paid: ₹${payment.amount}`}>
-                                                                        <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center"><Icons.Check /></div>
-                                                                    </div>
+                                                                    <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center" title={`Paid: ₹${payment.amount}`}><Icons.Check /></div>
                                                                 ) : (
-                                                                    <div className="flex flex-col items-center" title={`Partial Paid: ₹${payment.amount}`}>
-                                                                        <div className="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center"><Icons.Warning /></div>
-                                                                    </div>
+                                                                    <div className="w-6 h-6 rounded-full bg-yellow-100 flex items-center justify-center" title={`Partial Paid: ₹${payment.amount}`}><Icons.Warning /></div>
                                                                 )}
                                                             </div>
                                                         </td>
@@ -428,12 +451,12 @@
 
                     {/* Pagination */}
                     {totalPages > 1 && (
-                        <div className="flex justify-between items-center bg-gray-50 p-4 rounded-lg border">
-                            <span className="text-sm text-gray-600">Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, filteredStudents.length)} of {filteredStudents.length}</span>
-                            <div className="flex space-x-2">
-                                <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="px-3 py-1 border rounded bg-white disabled:opacity-50">Prev</button>
-                                <span className="px-3 py-1 font-medium">Page {currentPage} of {totalPages}</span>
-                                <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="px-3 py-1 border rounded bg-white disabled:opacity-50">Next</button>
+                        <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border">
+                            <span className="text-xs font-medium text-gray-500">Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, filteredStudents.length)} of {filteredStudents.length}</span>
+                            <div className="flex space-x-2 text-sm">
+                                <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="px-3 py-1 border rounded bg-white disabled:opacity-50 hover:bg-gray-100 font-medium">Prev</button>
+                                <span className="px-3 py-1 font-bold text-gray-700">Page {currentPage} of {totalPages}</span>
+                                <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="px-3 py-1 border rounded bg-white disabled:opacity-50 hover:bg-gray-100 font-medium">Next</button>
                             </div>
                         </div>
                     )}
@@ -447,25 +470,13 @@
                             onClose={() => setFamilyModalOpen(false)}
                         />
                     )}
-
-                    {paymentModalOpen && (
-                        <GroupPaymentModal 
-                            context={paymentGroupData}
-                            onClose={() => setPaymentModalOpen(false)}
-                        />
-                    )}
-
-                    {profileModalOpen && (
-                        <StudentProfileModal
-                            student={selectedProfile}
-                            onClose={() => setProfileModalOpen(false)}
-                        />
-                    )}
+                    {paymentModalOpen && <GroupPaymentModal context={paymentGroupData} onClose={() => setPaymentModalOpen(false)} />}
+                    {profileModalOpen && <StudentProfileModal student={selectedProfile} onClose={() => setProfileModalOpen(false)} />}
                 </div>
             );
         };
 
-        // --- STUDENT PROFILE MODAL (NEW) ---
+        // --- STUDENT PROFILE MODAL ---
         const StudentProfileModal = ({ student, onClose }) => {
             if (!student) return null;
             const prof = student.profile || {};
@@ -479,44 +490,24 @@
                         </div>
                         <div className="p-6">
                             <div className="flex items-center space-x-4 border-b pb-4 mb-4">
-                                <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-2xl font-bold">
+                                <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-2xl font-bold uppercase">
                                     {student.name.charAt(0)}
                                 </div>
                                 <div>
-                                    <h2 className="text-xl font-bold text-gray-800">{student.name}</h2>
+                                    <h2 className="text-xl font-bold text-gray-800 uppercase">{student.name}</h2>
                                     <p className="text-sm font-medium text-blue-600">Class: {student.studentClass} | {student.gender === 'M' ? 'Male' : 'Female'}</p>
                                 </div>
                             </div>
                             
                             <div className="grid grid-cols-2 gap-y-4 gap-x-6 text-sm">
-                                <div>
-                                    <span className="block text-gray-500 font-medium text-xs">Guardian / Father</span>
-                                    <span className="font-bold text-gray-800">{student.guardian || '-'}</span>
-                                </div>
-                                <div>
-                                    <span className="block text-gray-500 font-medium text-xs">Mobile Number</span>
-                                    <span className="font-bold text-gray-800">{student.phone || '-'}</span>
-                                </div>
-                                <div className="col-span-2">
-                                    <span className="block text-gray-500 font-medium text-xs">Permanent Address</span>
-                                    <span className="font-bold text-gray-800">{prof.address || '-'}</span>
-                                </div>
-                                <div>
-                                    <span className="block text-gray-500 font-medium text-xs">Date of Birth (DOB)</span>
-                                    <span className="font-bold text-gray-800">{prof.dob || '-'}</span>
-                                </div>
-                                <div>
-                                    <span className="block text-gray-500 font-medium text-xs">Aadhaar Number</span>
-                                    <span className="font-bold text-gray-800">{prof.adhaar || '-'}</span>
-                                </div>
-                                <div>
-                                    <span className="block text-gray-500 font-medium text-xs">Admission No.</span>
-                                    <span className="font-bold text-gray-800">{prof.admNo || '-'}</span>
-                                </div>
-                                <div>
-                                    <span className="block text-gray-500 font-medium text-xs">Samastha ID</span>
-                                    <span className="font-bold text-gray-800">{prof.samasthaId || '-'}</span>
-                                </div>
+                                <div><span className="block text-gray-500 font-medium text-xs">Guardian / Father</span><span className="font-bold text-gray-800">{student.guardian || '-'}</span></div>
+                                <div><span className="block text-gray-500 font-medium text-xs">Mobile Number</span><span className="font-bold text-gray-800">{student.phone || '-'}</span></div>
+                                <div className="col-span-2"><span className="block text-gray-500 font-medium text-xs">Permanent Address</span><span className="font-bold text-gray-800">{prof.address || '-'}</span></div>
+                                <div><span className="block text-gray-500 font-medium text-xs">Date of Birth (DOB)</span><span className="font-bold text-gray-800">{prof.dob || '-'}</span></div>
+                                <div><span className="block text-gray-500 font-medium text-xs">Aadhaar Number</span><span className="font-bold text-gray-800">{prof.adhaar || '-'}</span></div>
+                                <div><span className="block text-gray-500 font-medium text-xs">Admission No.</span><span className="font-bold text-gray-800">{prof.admNo || '-'}</span></div>
+                                <div><span className="block text-gray-500 font-medium text-xs">Admission Date</span><span className="font-bold text-gray-800">{prof.admDate || '-'}</span></div>
+                                <div className="col-span-2"><span className="block text-gray-500 font-medium text-xs">Samastha ID</span><span className="font-bold text-gray-800">{prof.samasthaId || '-'}</span></div>
                             </div>
                         </div>
                         <div className="bg-gray-50 px-6 py-4 border-t flex justify-end">
@@ -527,19 +518,28 @@
             );
         };
 
-        // --- FAMILY / GROUP SETUP MODAL ---
+        // --- EXPANDED FAMILY / GROUP SETUP MODAL ---
         const FamilySetupModal = ({ primaryStudent, allStudents, globalBaseFee, onClose }) => {
             const [members, setMembers] = useState([]);
             const [searchClass, setSearchClass] = useState('');
             const [searchName, setSearchName] = useState('');
             
+            // Shared Group Details
             const [groupFee, setGroupFee] = useState('');
             const [guardian, setGuardian] = useState('');
             const [phone, setPhone] = useState('');
             const [pendingArrears, setPendingArrears] = useState('');
+            
+            // Primary Student Details (Expanded to match CSV fields)
             const [stName, setStName] = useState('');
             const [stClass, setStClass] = useState('');
             const [stGender, setStGender] = useState('');
+            const [stDob, setStDob] = useState('');
+            const [stAddress, setStAddress] = useState('');
+            const [stAdhaar, setStAdhaar] = useState('');
+            const [stAdmNo, setStAdmNo] = useState('');
+            const [stAdmDate, setStAdmDate] = useState('');
+            const [stSamasthaId, setStSamasthaId] = useState('');
 
             useEffect(() => {
                 const grp = allStudents.filter(s => s.groupId === primaryStudent.groupId);
@@ -551,18 +551,20 @@
                 
                 const p = grp.find(s => s.id === primaryStudent.id);
                 if(p) {
-                    setStName(p.name); setStClass(p.studentClass); setStGender(p.gender);
+                    setStName(p.name || ''); setStClass(p.studentClass || ''); setStGender(p.gender || 'M');
+                    const prof = p.profile || {};
+                    setStDob(prof.dob || ''); setStAddress(prof.address || ''); setStAdhaar(prof.adhaar || '');
+                    setStAdmNo(prof.admNo || ''); setStAdmDate(prof.admDate || ''); setStSamasthaId(prof.samasthaId || '');
                 }
             }, [primaryStudent, allStudents]);
 
             const handleAddSibling = (studentToAdd) => {
                 if (members.find(m => m.id === studentToAdd.id)) return;
-                if (studentToAdd.phone && studentToAdd.phone !== phone) {
+                if (studentToAdd.phone && studentToAdd.phone !== phone && phone !== '') {
                     const keepPrimary = window.confirm(`Conflict!\nPrimary Phone: ${phone}\nSibling Phone: ${studentToAdd.phone}\n\nClick OK to keep Primary Phone.\nClick Cancel to use Sibling Phone.`);
-                    if (!keepPrimary) {
-                        setPhone(studentToAdd.phone);
-                        setGuardian(studentToAdd.guardian);
-                    }
+                    if (!keepPrimary) { setPhone(studentToAdd.phone); setGuardian(studentToAdd.guardian); }
+                } else if (!phone) {
+                    setPhone(studentToAdd.phone || ''); setGuardian(studentToAdd.guardian || '');
                 }
                 setPendingArrears(prev => parseInt(prev || 0) + parseInt(studentToAdd.pendingArrears || 0));
                 setMembers([...members, studentToAdd]);
@@ -579,13 +581,18 @@
             const handleSave = async (e) => {
                 e.preventDefault();
                 const batch = db.batch();
-                const finalGroupId = members[0].groupId || db.collection('students').doc().id;
+                const finalGroupId = members[0]?.groupId || db.collection('students').doc().id;
                 const finalFee = groupFee ? parseInt(groupFee) : null;
                 const finalArrears = parseInt(pendingArrears || 0);
 
+                // Save Profile details for the primary student being edited
                 const primaryRef = db.collection('students').doc(primaryStudent.id);
-                batch.update(primaryRef, { name: stName.toUpperCase(), studentClass: stClass, gender: stGender });
+                batch.update(primaryRef, { 
+                    name: stName.toUpperCase(), studentClass: stClass, gender: stGender,
+                    profile: { dob: stDob, address: stAddress, adhaar: stAdhaar, admNo: stAdmNo, admDate: stAdmDate, samasthaId: stSamasthaId }
+                });
 
+                // Update shared details for ALL group members
                 members.forEach(m => {
                     const docRef = db.collection('students').doc(m.id);
                     batch.update(docRef, {
@@ -594,6 +601,7 @@
                     });
                 });
 
+                // Ungroup removed members
                 const originalMembers = allStudents.filter(s => s.groupId === primaryStudent.groupId);
                 originalMembers.forEach(om => {
                     if (!members.find(m => m.id === om.id)) {
@@ -615,83 +623,106 @@
             const calculateDefaultFee = () => members.length * globalBaseFee;
 
             return (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full flex flex-col max-h-[90vh]">
-                        <div className="bg-yellow-600 px-6 py-4 flex justify-between items-center text-white shrink-0">
-                            <h3 className="text-lg font-bold flex items-center"><Icons.Link /> Student & Family Setup</h3>
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+                    <div className="bg-gray-100 rounded-lg shadow-2xl max-w-5xl w-full flex flex-col h-[95vh] md:h-[90vh]">
+                        <div className="bg-yellow-600 px-6 py-4 flex justify-between items-center text-white shrink-0 shadow-sm z-10">
+                            <h3 className="text-lg font-bold flex items-center"><Icons.Link /> Add / Edit Student & Setup Family</h3>
                             <button onClick={onClose} className="hover:text-gray-200"><Icons.Close /></button>
                         </div>
                         
-                        <div className="flex-1 overflow-y-auto p-6 bg-gray-50 flex flex-col lg:flex-row gap-6">
-                            <div className="flex-1 space-y-6">
-                                <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                                    <h4 className="font-bold text-gray-800 mb-3 border-b pb-2">Student Details</h4>
-                                    <div className="grid grid-cols-3 gap-3">
-                                        <div className="col-span-3"><label className="text-xs font-bold text-gray-500">Name</label><input type="text" className="w-full p-2 border rounded font-bold uppercase" value={stName} onChange={e => setStName(e.target.value)} required /></div>
-                                        <div><label className="text-xs font-bold text-gray-500">Class</label><select className="w-full p-2 border rounded" value={stClass} onChange={e => setStClass(e.target.value)}>{CLASSES.map(c => <option key={c}>{c}</option>)}</select></div>
-                                        <div><label className="text-xs font-bold text-gray-500">Gender</label><select className="w-full p-2 border rounded" value={stGender} onChange={e => setStGender(e.target.value)}><option value="M">Male</option><option value="F">Female</option></select></div>
+                        <div className="flex-1 overflow-y-auto p-4 flex flex-col lg:flex-row gap-4">
+                            
+                            {/* LEFT PANEL: Student Detailed Form */}
+                            <div className="flex-1 lg:w-3/5 space-y-4">
+                                <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-200">
+                                    <h4 className="font-bold text-gray-800 mb-4 border-b pb-2">1. Student Profile Details</h4>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div className="sm:col-span-2"><label className="text-xs font-bold text-gray-500 mb-1 block">Full Name *</label><input type="text" className="w-full p-2.5 border rounded font-bold uppercase focus:ring-2 focus:ring-blue-400 outline-none" value={stName} onChange={e => setStName(e.target.value)} required /></div>
+                                        <div><label className="text-xs font-bold text-gray-500 mb-1 block">Class *</label><select className="w-full p-2.5 border rounded bg-white focus:ring-2 focus:ring-blue-400 outline-none" value={stClass} onChange={e => setStClass(e.target.value)}>{CLASSES.map(c => <option key={c}>{c}</option>)}</select></div>
+                                        <div><label className="text-xs font-bold text-gray-500 mb-1 block">Gender *</label><select className="w-full p-2.5 border rounded bg-white focus:ring-2 focus:ring-blue-400 outline-none" value={stGender} onChange={e => setStGender(e.target.value)}><option value="M">Male</option><option value="F">Female</option></select></div>
+                                        
+                                        <div><label className="text-xs font-bold text-gray-500 mb-1 block">Admission No.</label><input type="text" className="w-full p-2 border rounded outline-none" value={stAdmNo} onChange={e => setStAdmNo(e.target.value)} /></div>
+                                        <div><label className="text-xs font-bold text-gray-500 mb-1 block">Date of Admission</label><input type="text" placeholder="DD-MM-YYYY" className="w-full p-2 border rounded outline-none" value={stAdmDate} onChange={e => setStAdmDate(e.target.value)} /></div>
+                                        
+                                        <div><label className="text-xs font-bold text-gray-500 mb-1 block">Date of Birth</label><input type="text" placeholder="DD-MM-YYYY" className="w-full p-2 border rounded outline-none" value={stDob} onChange={e => setStDob(e.target.value)} /></div>
+                                        <div><label className="text-xs font-bold text-gray-500 mb-1 block">Aadhaar No.</label><input type="text" className="w-full p-2 border rounded outline-none" value={stAdhaar} onChange={e => setStAdhaar(e.target.value)} /></div>
+                                        
+                                        <div className="sm:col-span-2"><label className="text-xs font-bold text-gray-500 mb-1 block">Permanent Address</label><textarea rows="2" className="w-full p-2 border rounded outline-none" value={stAddress} onChange={e => setStAddress(e.target.value)}></textarea></div>
+                                        <div className="sm:col-span-2"><label className="text-xs font-bold text-gray-500 mb-1 block">Samastha Online ID</label><input type="text" className="w-full p-2 border rounded outline-none" value={stSamasthaId} onChange={e => setStSamasthaId(e.target.value)} /></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* RIGHT PANEL: Grouping & Finance */}
+                            <div className="flex-1 lg:w-2/5 flex flex-col space-y-4">
+                                
+                                <div className="bg-white p-5 rounded-lg shadow-sm border border-yellow-300">
+                                    <h4 className="font-bold text-yellow-800 mb-4 border-b border-yellow-200 pb-2">2. Shared Family Setup (Finance)</h4>
+                                    <div className="space-y-4">
+                                        <div><label className="block text-xs font-bold text-gray-500 mb-1">Guardian / Father Name (Shared)</label><input type="text" className="w-full p-2.5 border border-gray-300 rounded uppercase focus:ring-2 focus:ring-yellow-400 outline-none font-bold" value={guardian} onChange={e => setGuardian(e.target.value)} /></div>
+                                        <div><label className="block text-xs font-bold text-gray-500 mb-1">Mobile No. (Acts as Group ID)</label><input type="tel" className="w-full p-2.5 border border-gray-300 rounded font-bold focus:ring-2 focus:ring-yellow-400 outline-none" value={phone} onChange={e => setPhone(e.target.value)} /></div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-500 mb-1">Pending Arrears (₹)</label>
+                                                <input type="number" min="0" className="w-full p-2.5 border border-red-300 rounded bg-red-50 text-red-700 font-bold outline-none" value={pendingArrears} onChange={e => setPendingArrears(e.target.value)} />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-yellow-800 mb-1">Total Fee / Mnt</label>
+                                                <input type="number" min="0" placeholder={`₹${calculateDefaultFee()}`} className="w-full p-2.5 border border-yellow-400 rounded bg-yellow-50 text-yellow-900 font-bold outline-none placeholder-yellow-600/50" value={groupFee} onChange={e => setGroupFee(e.target.value)} />
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div className="bg-white p-4 rounded-lg shadow-sm border border-blue-200">
-                                    <h4 className="font-bold text-blue-800 mb-3 border-b pb-2 flex justify-between">
-                                        <span>Link Siblings</span><span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">{members.length} Members</span>
+                                <div className="bg-white p-4 rounded-lg shadow-sm border border-blue-200 flex-1 flex flex-col">
+                                    <h4 className="font-bold text-blue-800 mb-3 border-b pb-2 flex justify-between items-center">
+                                        <span>3. Link Siblings (Manual)</span><span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">{members.length} Selected</span>
                                     </h4>
-                                    <div className="flex space-x-2 mb-4 bg-blue-50 p-3 rounded">
-                                        <select className="p-2 border rounded text-sm w-1/3" value={searchClass} onChange={e => setSearchClass(e.target.value)}><option value="">Class</option>{CLASSES.map(c => <option key={c} value={c}>{c}</option>)}</select>
-                                        <input type="text" placeholder="Search name..." className="p-2 border rounded text-sm flex-1" value={searchName} onChange={e => setSearchName(e.target.value)} />
+                                    
+                                    <div className="flex space-x-2 mb-3 bg-blue-50 p-2 rounded border border-blue-100">
+                                        <select className="p-2 border rounded text-xs w-2/5 outline-none" value={searchClass} onChange={e => setSearchClass(e.target.value)}><option value="">Class</option>{CLASSES.map(c => <option key={c} value={c}>{c}</option>)}</select>
+                                        <input type="text" placeholder="Search to add..." className="p-2 border rounded text-xs flex-1 outline-none" value={searchName} onChange={e => setSearchName(e.target.value)} />
                                     </div>
+                                    
                                     {searchName && searchClass && (
-                                        <div className="mb-4 border border-green-200 rounded max-h-32 overflow-y-auto bg-green-50">
-                                            {searchResults.length === 0 ? <div className="p-2 text-sm text-gray-500">No matches found.</div> : 
+                                        <div className="mb-3 border border-green-200 rounded max-h-24 overflow-y-auto bg-green-50 shadow-inner">
+                                            {searchResults.length === 0 ? <div className="p-2 text-xs text-gray-500 text-center">No unlinked matches found.</div> : 
                                                 searchResults.map(s => (
                                                     <div key={s.id} className="flex justify-between items-center p-2 border-b hover:bg-green-100">
-                                                        <span className="text-sm font-bold">{s.name}</span>
-                                                        <button type="button" onClick={() => handleAddSibling(s)} className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700">Add</button>
+                                                        <span className="text-xs font-bold truncate max-w-[150px]">{s.name}</span>
+                                                        <button type="button" onClick={() => handleAddSibling(s)} className="text-[10px] font-bold bg-green-600 text-white px-2 py-1 rounded shadow-sm hover:bg-green-700">ADD</button>
                                                     </div>
                                                 ))
                                             }
                                         </div>
                                     )}
-                                    <div className="space-y-2">
+                                    
+                                    <div className="space-y-2 overflow-y-auto flex-1 pr-1">
                                         {members.map(m => (
-                                            <div key={m.id} className={`flex justify-between items-center p-2 rounded border ${m.id === primaryStudent.id ? 'bg-yellow-100 border-yellow-300' : 'bg-gray-50'}`}>
-                                                <div><span className="font-bold">{m.name}</span> <span className="text-xs text-gray-500 bg-gray-200 px-1 rounded ml-1">Class {m.studentClass}</span></div>
-                                                {m.id !== primaryStudent.id && <button type="button" onClick={() => removeMember(m.id)} className="text-red-500"><Icons.Close /></button>}
+                                            <div key={m.id} className={`flex justify-between items-center p-2 rounded border ${m.id === primaryStudent.id ? 'bg-yellow-50 border-yellow-400' : 'bg-gray-50 border-gray-200'}`}>
+                                                <div className="truncate"><span className="font-bold text-sm text-gray-800">{m.name}</span> <span className="text-[10px] text-gray-600 font-medium bg-gray-200 px-1.5 py-0.5 rounded ml-1">Cls {m.studentClass}</span></div>
+                                                {m.id !== primaryStudent.id && <button type="button" onClick={() => removeMember(m.id)} className="text-red-500 hover:text-red-700 p-1"><Icons.Close /></button>}
                                             </div>
                                         ))}
+                                        {members.length > 1 && <p className="text-[10px] text-gray-400 text-center mt-2 font-medium">All students listed above share the same Finance Setup.</p>}
                                     </div>
                                 </div>
-                            </div>
 
-                            <div className="flex-1 space-y-6">
-                                <div className="bg-white p-4 rounded-lg shadow-sm border border-yellow-300">
-                                    <h4 className="font-bold text-yellow-800 mb-3 border-b border-yellow-200 pb-2">Shared Group Details</h4>
-                                    <div className="space-y-4">
-                                        <div><label className="block text-sm font-bold text-gray-700 mb-1">Guardian Name</label><input type="text" className="w-full px-3 py-2 border rounded-md uppercase" value={guardian} onChange={e => setGuardian(e.target.value)} /></div>
-                                        <div><label className="block text-sm font-bold text-gray-700 mb-1">Phone Number (Group ID)</label><input type="tel" className="w-full px-3 py-2 border rounded-md font-bold" value={phone} onChange={e => setPhone(e.target.value)} /></div>
-                                        <div><label className="block text-sm font-bold text-gray-700 mb-1">Pending Arrears (₹)</label><input type="number" min="0" className="w-full px-3 py-2 border rounded-md bg-red-50 text-red-700 font-bold" value={pendingArrears} onChange={e => setPendingArrears(e.target.value)} /></div>
-                                        
-                                        <div className="bg-yellow-50 p-4 border border-yellow-400 rounded-lg">
-                                            <label className="block text-sm font-bold text-yellow-900 mb-1">Total Group Fee (₹)</label>
-                                            <div className="flex items-center space-x-3">
-                                                <input type="number" min="0" placeholder={`Default: ₹${calculateDefaultFee()}`} className="flex-1 px-3 py-2 border-2 border-yellow-400 rounded-md text-lg font-bold" value={groupFee} onChange={e => setGroupFee(e.target.value)} />
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
                             </div>
                         </div>
-                        <div className="bg-white px-6 py-4 border-t flex justify-between shrink-0">
+
+                        {/* Footer Actions */}
+                        <div className="bg-white px-6 py-4 border-t flex justify-between items-center shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] rounded-b-lg">
                             <button type="button" onClick={async () => {
-                                if(window.confirm("Delete this student completely?")) {
+                                if(window.confirm("Permanently delete this student record? This cannot be undone.")) {
                                     await db.collection('students').doc(primaryStudent.id).delete();
                                     onClose();
                                 }
-                            }} className="text-red-600 font-bold text-sm">Delete Student</button>
+                            }} className="text-red-600 font-bold text-sm hover:underline">Delete Record</button>
+                            
                             <div className="space-x-3">
-                                <button type="button" onClick={onClose} className="px-4 py-2 border rounded-md hover:bg-gray-100 font-medium">Cancel</button>
-                                <button type="button" onClick={handleSave} className="px-6 py-2 bg-yellow-600 text-white rounded-md font-bold shadow-sm">Save Group</button>
+                                <button type="button" onClick={onClose} className="px-5 py-2.5 border border-gray-300 rounded-md hover:bg-gray-50 font-bold text-gray-700 transition-colors">Cancel</button>
+                                <button type="button" onClick={handleSave} className="px-8 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-yellow-950 rounded-md font-extrabold shadow-md transition-colors">Save All Details</button>
                             </div>
                         </div>
                     </div>
@@ -753,17 +784,17 @@
                         <form onSubmit={handleSave} className="p-6 space-y-4">
                             <div className="bg-gray-50 p-3 rounded border text-sm text-gray-700 mb-4">
                                 <p className="font-bold border-b pb-1 mb-2">Paying for {members.length} Student(s):</p>
-                                <div className="space-y-1 mb-2 max-h-20 overflow-y-auto">{members.map(m => <div key={m.id} className="text-xs">• {m.name}</div>)}</div>
+                                <div className="space-y-1 mb-2 max-h-20 overflow-y-auto">{members.map(m => <div key={m.id} className="text-xs font-bold">• {m.name}</div>)}</div>
                                 <p className="text-lg font-bold text-green-800 mt-2 border-t pt-2">Due: ₹{groupFee}</p>
                             </div>
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-1">Paid (₹)</label>
                                 <input type="number" required min="1" className="w-full px-4 py-3 border rounded-md text-2xl font-bold" value={amount} onChange={e => setAmount(e.target.value)} />
                             </div>
-                            <div><label className="block text-sm font-medium">Receipt No</label><input type="text" className="w-full px-4 py-2 border rounded-md uppercase" value={receipt} onChange={e => setReceipt(e.target.value)} /></div>
+                            <div><label className="block text-sm font-bold">Receipt No</label><input type="text" className="w-full px-4 py-2 border rounded-md uppercase font-bold" value={receipt} onChange={e => setReceipt(e.target.value)} /></div>
                             <div className="pt-4 flex justify-between mt-6">
-                                {existingPayment ? <button type="button" onClick={() => setConfirmDel(true)} className="text-red-600 font-bold px-3 py-2">Delete</button> : <div></div>}
-                                <div className="space-x-3"><button type="button" onClick={onClose} className="px-4 py-2 font-medium">Cancel</button><button type="submit" className="px-6 py-2 bg-green-600 text-white rounded-md font-bold">Save</button></div>
+                                {existingPayment ? <button type="button" onClick={() => setConfirmDel(true)} className="text-red-600 font-bold px-3 py-2">Delete Record</button> : <div></div>}
+                                <div className="space-x-3"><button type="button" onClick={onClose} className="px-4 py-2 font-bold text-gray-600 border rounded">Cancel</button><button type="submit" className="px-6 py-2 bg-green-600 text-white rounded-md font-bold shadow-md">Save</button></div>
                             </div>
                         </form>
                     </div>
@@ -791,7 +822,7 @@
                         <div className="flex items-center mb-6 border-b pb-4"><div className="p-3 bg-green-100 text-green-700 rounded-lg mr-4"><Icons.Settings /></div><div><h2 className="text-xl font-bold">Global Configuration</h2></div></div>
                         <form onSubmit={handleSave}>
                             <div className="mb-6"><label className="block text-sm font-bold mb-2">Default Base Fee (₹)</label><input type="number" required min="0" className="w-full md:w-1/2 px-4 py-3 border rounded-md text-lg font-bold" value={baseFee} onChange={e => setBaseFee(e.target.value)} /></div>
-                            <button type="submit" disabled={saving} className="px-8 py-3 bg-green-600 hover:bg-green-700 rounded-md font-bold text-white transition-all">Save Config</button>
+                            <button type="submit" disabled={saving} className="px-8 py-3 bg-green-600 hover:bg-green-700 rounded-md font-bold text-white transition-all shadow-md">Save Config</button>
                         </form>
                     </div>
                 </div>
