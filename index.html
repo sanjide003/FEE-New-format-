@@ -51,7 +51,7 @@
         const app = firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // Constants (Classes ordered highest to lowest as requested)
+        // Constants 
         const MONTHS = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
         const CLASSES = ['+2', '+1', '10', '9', '8', '7', '6', '5', '4', '3', '2', '1'];
 
@@ -67,8 +67,8 @@
             Settings: () => <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>,
             Users: () => <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>,
             Link: () => <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>,
-            Download: () => <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>,
-            Upload: () => <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+            Upload: () => <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>,
+            UserCircle: () => <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
         };
 
         const CustomConfirm = ({ isOpen, message, onConfirm, onCancel, confirmText = "Confirm", type = "danger" }) => {
@@ -148,8 +148,13 @@
             const [paymentModalOpen, setPaymentModalOpen] = useState(false);
             const [paymentGroupData, setPaymentGroupData] = useState(null);
 
+            const [profileModalOpen, setProfileModalOpen] = useState(false);
+            const [selectedProfile, setSelectedProfile] = useState(null);
+
+            // CSV Upload State
             const fileInputRef = useRef(null);
             const [uploading, setUploading] = useState(false);
+            const [selectedUploadClass, setSelectedUploadClass] = useState('');
 
             // Fetch grouped students dynamically
             const getGroupMembers = (groupId) => students.filter(s => s.groupId === groupId);
@@ -160,8 +165,9 @@
                 if (search) {
                     const q = search.toLowerCase();
                     result = result.filter(s => 
-                        s.name.toLowerCase().includes(q) || 
+                        s.name?.toLowerCase().includes(q) || 
                         s.phone?.includes(q) || 
+                        s.guardian?.toLowerCase().includes(q) ||
                         (s.payments && Object.values(s.payments).some(p => p.receipt?.toLowerCase().includes(q)))
                     );
                 }
@@ -170,13 +176,12 @@
 
                 result.sort((a, b) => {
                     if (sortOption === 'CLASS_DESC') {
-                        // HIGHEST CLASS FIRST (+2 to 1) based on CLASSES array index
                         const idxA = CLASSES.indexOf(a.studentClass);
                         const idxB = CLASSES.indexOf(b.studentClass);
                         if (idxA !== idxB) return idxA - idxB;
-                        return a.name.localeCompare(b.name);
+                        return (a.name || '').localeCompare(b.name || '');
                     }
-                    if (sortOption === 'NAME_ASC') return a.name.localeCompare(b.name);
+                    if (sortOption === 'NAME_ASC') return (a.name || '').localeCompare(b.name || '');
                     if (sortOption === 'GENDER_MALE') return (a.gender === 'M' ? -1 : 1);
                     return 0;
                 });
@@ -187,15 +192,13 @@
             const totalPages = Math.ceil(filteredStudents.length / perPage);
             const paginatedStudents = filteredStudents.slice((currentPage - 1) * perPage, currentPage * perPage);
 
-            // --- CSV UPLOAD LOGIC ---
-            const downloadTemplate = () => {
-                const csvContent = "Name,Class,Gender,Guardian,Phone,Pending Arrears\nSADIK,+2,M,ABDUL,9876543210,500\nFATHIMA,10,F,ABDUL,9876543210,0";
-                const blob = new Blob([csvContent], { type: 'text/csv' });
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = "Madrasa_Bulk_Upload_Template.csv";
-                a.click();
+            // --- CSV UPLOAD LOGIC (Optimized for Samastha Format) ---
+            const triggerFileUpload = () => {
+                if (!selectedUploadClass) {
+                    alert("Please select a Class from the dropdown before uploading the CSV file.");
+                    return;
+                }
+                fileInputRef.current.click();
             };
 
             const handleFileUpload = (e) => {
@@ -211,89 +214,101 @@
                             const batch = db.batch();
                             const parsedData = results.data;
                             
-                            // Auto Grouping Logic via Phone
                             const phoneGroups = {};
                             
                             parsedData.forEach(row => {
-                                const phone = (row['Phone'] || '').trim();
+                                // Fallback mapping to catch variations in CSV headers
+                                const rawName = row['Name'] || row['Student Name'] || row['Full Name'] || '';
+                                if (!rawName) return; // Skip if no name found
+
+                                const rawPhone = (row['Mobile'] || row['Phone'] || '').trim();
+                                const rawGender = (row['Gender'] || '').trim().toUpperCase();
+                                
                                 const studentData = {
-                                    name: (row['Name'] || '').trim().toUpperCase(),
-                                    studentClass: (row['Class'] || '1').trim(),
-                                    gender: (row['Gender'] || 'M').trim().toUpperCase() === 'F' ? 'F' : 'M',
-                                    guardian: (row['Guardian'] || '').trim().toUpperCase(),
-                                    phone: phone,
-                                    pendingArrears: parseInt(row['Pending Arrears'] || 0),
+                                    name: rawName.trim().toUpperCase(),
+                                    studentClass: selectedUploadClass, // Assigned from UI
+                                    gender: rawGender.startsWith('F') ? 'F' : 'M',
+                                    guardian: (row['Father'] || row['Guardian'] || '').trim().toUpperCase(),
+                                    phone: rawPhone,
+                                    pendingArrears: 0, // Default to 0 for new bulk upload
                                     groupFee: null,
-                                    payments: {}
+                                    payments: {},
+                                    // Storing extra details from Samastha CSV format
+                                    profile: {
+                                        dob: row['DOB'] || '',
+                                        address: row['Permanent Address'] || '',
+                                        adhaar: row['Adhaar'] || '',
+                                        admNo: row['Adm. No'] || '',
+                                        samasthaId: row['ID'] || '',
+                                        admDate: row['Adm. Date'] || ''
+                                    }
                                 };
 
-                                if (!phone) {
+                                if (!rawPhone) {
                                     studentData.groupId = db.collection('students').doc().id; // Solo group
                                     const docRef = db.collection('students').doc(studentData.groupId);
                                     batch.set(docRef, studentData);
                                 } else {
-                                    if (!phoneGroups[phone]) {
-                                        phoneGroups[phone] = { 
+                                    if (!phoneGroups[rawPhone]) {
+                                        phoneGroups[rawPhone] = { 
                                             groupId: db.collection('students').doc().id, 
-                                            students: [], 
-                                            totalArrears: 0 
+                                            students: [] 
                                         };
                                     }
-                                    studentData.groupId = phoneGroups[phone].groupId;
-                                    phoneGroups[phone].students.push(studentData);
-                                    phoneGroups[phone].totalArrears += studentData.pendingArrears;
+                                    studentData.groupId = phoneGroups[rawPhone].groupId;
+                                    phoneGroups[rawPhone].students.push(studentData);
                                 }
                             });
 
-                            // Apply grouped arrears and add to batch
+                            // Add grouped students to batch
                             Object.values(phoneGroups).forEach(group => {
                                 group.students.forEach(std => {
-                                    std.pendingArrears = group.totalArrears; // Share total arrears
-                                    const docRef = db.collection('students').doc(); // New document id for student
+                                    const docRef = db.collection('students').doc(); 
                                     batch.set(docRef, std);
                                 });
                             });
 
                             await batch.commit();
-                            alert("Bulk upload successful! Students and Siblings grouped automatically.");
+                            alert("Bulk upload successful! Students are imported to class " + selectedUploadClass);
                         } catch (err) {
                             console.error("Upload error:", err);
-                            alert("Error uploading data. Check console.");
+                            alert("Error uploading data. Please check your CSV format.");
                         }
                         setUploading(false);
-                        e.target.value = null; // reset
+                        setSelectedUploadClass(''); // Reset class
+                        e.target.value = null; // reset input
                     }
                 });
             };
 
-            // Setup new single student manually
             const handleAddSingle = async () => {
                 const newDocRef = db.collection('students').doc();
                 const newId = newDocRef.id;
                 await newDocRef.set({
                     name: 'NEW STUDENT', studentClass: '+2', gender: 'M', guardian: '', phone: '',
-                    groupId: newId, pendingArrears: 0, groupFee: null, payments: {}
+                    groupId: newId, pendingArrears: 0, groupFee: null, payments: {}, profile: {}
                 });
-                // Open family setup immediately for editing
                 setSelectedFamilyStudent({ id: newId, name: 'NEW STUDENT', groupId: newId });
                 setFamilyModalOpen(true);
             };
 
             const openPaymentModal = (groupMembers, month) => {
-                // Determine base group fee
                 const groupFee = groupMembers[0]?.groupFee || (groupMembers.length * settings.globalBaseFee);
-                // Group shares the payment object exactly
                 const existingPayment = groupMembers[0]?.payments?.[month]; 
-                
                 setPaymentGroupData({ members: groupMembers, month, groupFee, existingPayment });
                 setPaymentModalOpen(true);
+            };
+
+            const openProfileModal = (student) => {
+                setSelectedProfile(student);
+                setProfileModalOpen(true);
             };
 
             return (
                 <div className="flex flex-col space-y-4">
                     {/* Top Controls */}
                     <div className="flex flex-col xl:flex-row justify-between items-center gap-4 bg-gray-50 p-4 rounded-lg border">
-                        <div className="flex items-center space-x-2 w-full xl:w-1/3 relative">
+                        <div className="flex items-center space-x-2 w-full xl:w-1/4 relative">
                             <Icons.Search />
                             <input type="text" placeholder="Search Name, Phone, or Receipt..." className="w-full px-3 py-2 border rounded-md focus:ring-green-500 outline-none" value={search} onChange={e => { setSearch(e.target.value); setCurrentPage(1); }} />
                         </div>
@@ -313,14 +328,19 @@
                                 <span>Arrears Only</span>
                             </label>
                             
-                            <div className="border-l border-gray-300 mx-2 h-8"></div>
+                            <div className="border-l border-gray-300 mx-2 h-8 hidden xl:block"></div>
 
-                            <button onClick={downloadTemplate} className="flex items-center text-blue-600 hover:text-blue-800 text-sm font-medium"><Icons.Download /> Template</button>
-                            
-                            <input type="file" accept=".csv" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
-                            <button onClick={() => fileInputRef.current.click()} disabled={uploading} className="flex items-center bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-md font-medium text-sm disabled:opacity-50">
-                                <Icons.Upload /> {uploading ? 'Uploading...' : 'Bulk Upload'}
-                            </button>
+                            {/* CSV Upload Section with Class Selection */}
+                            <div className="flex items-center bg-blue-50 border border-blue-200 rounded-md p-1">
+                                <select className="px-2 py-1.5 bg-transparent outline-none text-sm font-bold text-blue-800" value={selectedUploadClass} onChange={e => setSelectedUploadClass(e.target.value)}>
+                                    <option value="">-- Target Class --</option>
+                                    {CLASSES.map(c => <option key={c} value={c}>Class {c}</option>)}
+                                </select>
+                                <input type="file" accept=".csv" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
+                                <button onClick={triggerFileUpload} disabled={uploading} className="flex items-center bg-blue-700 hover:bg-blue-800 text-white px-3 py-1.5 rounded font-medium text-sm disabled:opacity-50 ml-1">
+                                    <Icons.Upload /> {uploading ? 'Wait...' : 'Bulk Upload'}
+                                </button>
+                            </div>
 
                             <button onClick={handleAddSingle} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md font-medium text-sm transition-colors shadow-sm">
                                 + Add Student
@@ -329,9 +349,9 @@
                     </div>
 
                     {/* Data Table */}
-                    <div className="table-container border rounded-lg shadow-sm">
+                    <div className="table-container border rounded-lg shadow-sm bg-white">
                         <table className="min-w-full text-sm text-left whitespace-nowrap">
-                            <thead className="text-xs text-gray-700 uppercase bg-gray-100 sticky top-0 z-10 shadow-sm">
+                            <thead className="text-xs text-gray-700 uppercase bg-gray-100 sticky top-0 z-10 shadow-sm border-b">
                                 <tr>
                                     <th className="px-4 py-3">Sl.No</th>
                                     <th className="px-4 py-3">Class</th>
@@ -357,7 +377,9 @@
                                             <tr key={student.id} className="bg-white border-b hover:bg-green-50 transition-colors">
                                                 <td className="px-4 py-3 text-gray-500">{(currentPage - 1) * perPage + idx + 1}</td>
                                                 <td className="px-4 py-3 font-semibold">{student.studentClass}</td>
-                                                <td className="px-4 py-3 font-bold text-gray-900">{student.name}</td>
+                                                <td className="px-4 py-3 font-bold text-blue-600 hover:text-blue-800 cursor-pointer hover:underline" onClick={() => openProfileModal(student)}>
+                                                    {student.name}
+                                                </td>
                                                 <td className="px-2 py-3 text-center">{student.gender === 'M' ? <Icons.Male/> : <Icons.Female/>}</td>
                                                 <td className="px-4 py-3">{student.guardian}</td>
                                                 <td className="px-4 py-3 font-medium">{student.phone}</td>
@@ -370,7 +392,7 @@
                                                     </button>
                                                 </td>
                                                 
-                                                {/* Pending Arrears - Red if > 0. Same for whole group */}
+                                                {/* Pending Arrears */}
                                                 <td className={`px-4 py-3 text-right font-bold ${student.pendingArrears > 0 ? 'text-red-600 bg-red-50' : 'text-gray-400'}`}>
                                                     ₹{student.pendingArrears || 0}
                                                 </td>
@@ -432,6 +454,75 @@
                             onClose={() => setPaymentModalOpen(false)}
                         />
                     )}
+
+                    {profileModalOpen && (
+                        <StudentProfileModal
+                            student={selectedProfile}
+                            onClose={() => setProfileModalOpen(false)}
+                        />
+                    )}
+                </div>
+            );
+        };
+
+        // --- STUDENT PROFILE MODAL (NEW) ---
+        const StudentProfileModal = ({ student, onClose }) => {
+            if (!student) return null;
+            const prof = student.profile || {};
+            
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+                    <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden">
+                        <div className="bg-blue-600 px-6 py-4 flex justify-between items-center text-white">
+                            <h3 className="text-lg font-bold flex items-center"><Icons.UserCircle /> Student Profile</h3>
+                            <button onClick={onClose} className="hover:text-gray-200"><Icons.Close /></button>
+                        </div>
+                        <div className="p-6">
+                            <div className="flex items-center space-x-4 border-b pb-4 mb-4">
+                                <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-2xl font-bold">
+                                    {student.name.charAt(0)}
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold text-gray-800">{student.name}</h2>
+                                    <p className="text-sm font-medium text-blue-600">Class: {student.studentClass} | {student.gender === 'M' ? 'Male' : 'Female'}</p>
+                                </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-y-4 gap-x-6 text-sm">
+                                <div>
+                                    <span className="block text-gray-500 font-medium text-xs">Guardian / Father</span>
+                                    <span className="font-bold text-gray-800">{student.guardian || '-'}</span>
+                                </div>
+                                <div>
+                                    <span className="block text-gray-500 font-medium text-xs">Mobile Number</span>
+                                    <span className="font-bold text-gray-800">{student.phone || '-'}</span>
+                                </div>
+                                <div className="col-span-2">
+                                    <span className="block text-gray-500 font-medium text-xs">Permanent Address</span>
+                                    <span className="font-bold text-gray-800">{prof.address || '-'}</span>
+                                </div>
+                                <div>
+                                    <span className="block text-gray-500 font-medium text-xs">Date of Birth (DOB)</span>
+                                    <span className="font-bold text-gray-800">{prof.dob || '-'}</span>
+                                </div>
+                                <div>
+                                    <span className="block text-gray-500 font-medium text-xs">Aadhaar Number</span>
+                                    <span className="font-bold text-gray-800">{prof.adhaar || '-'}</span>
+                                </div>
+                                <div>
+                                    <span className="block text-gray-500 font-medium text-xs">Admission No.</span>
+                                    <span className="font-bold text-gray-800">{prof.admNo || '-'}</span>
+                                </div>
+                                <div>
+                                    <span className="block text-gray-500 font-medium text-xs">Samastha ID</span>
+                                    <span className="font-bold text-gray-800">{prof.samasthaId || '-'}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="bg-gray-50 px-6 py-4 border-t flex justify-end">
+                            <button onClick={onClose} className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-md font-bold">Close</button>
+                        </div>
+                    </div>
                 </div>
             );
         };
@@ -442,7 +533,6 @@
             const [searchClass, setSearchClass] = useState('');
             const [searchName, setSearchName] = useState('');
             
-            // Editable fields for the Primary Student (which copies to group if saved)
             const [groupFee, setGroupFee] = useState('');
             const [guardian, setGuardian] = useState('');
             const [phone, setPhone] = useState('');
@@ -451,7 +541,6 @@
             const [stClass, setStClass] = useState('');
             const [stGender, setStGender] = useState('');
 
-            // Init
             useEffect(() => {
                 const grp = allStudents.filter(s => s.groupId === primaryStudent.groupId);
                 setMembers(grp);
@@ -460,34 +549,28 @@
                 setPhone(grp[0]?.phone || '');
                 setPendingArrears(grp[0]?.pendingArrears || 0);
                 
-                // Set individual details of clicked student
                 const p = grp.find(s => s.id === primaryStudent.id);
                 if(p) {
                     setStName(p.name); setStClass(p.studentClass); setStGender(p.gender);
                 }
             }, [primaryStudent, allStudents]);
 
-            // Add Sibling Logic
             const handleAddSibling = (studentToAdd) => {
                 if (members.find(m => m.id === studentToAdd.id)) return;
-                
-                // Conflict Resolution Check
                 if (studentToAdd.phone && studentToAdd.phone !== phone) {
-                    const keepPrimary = window.confirm(`Conflict!\nPrimary Phone: ${phone}\nSibling Phone: ${studentToAdd.phone}\n\nClick OK to keep Primary Phone (${phone}) for both.\nClick Cancel to keep Sibling Phone (${studentToAdd.phone}) for both.`);
+                    const keepPrimary = window.confirm(`Conflict!\nPrimary Phone: ${phone}\nSibling Phone: ${studentToAdd.phone}\n\nClick OK to keep Primary Phone.\nClick Cancel to use Sibling Phone.`);
                     if (!keepPrimary) {
                         setPhone(studentToAdd.phone);
                         setGuardian(studentToAdd.guardian);
                     }
                 }
-                
-                // Sum up arrears
                 setPendingArrears(prev => parseInt(prev || 0) + parseInt(studentToAdd.pendingArrears || 0));
                 setMembers([...members, studentToAdd]);
                 setSearchName('');
             };
 
             const removeMember = (id) => {
-                if (members.length === 1) return; // Can't remove the only member
+                if (members.length === 1) return;
                 const memberToRemove = members.find(m => m.id === id);
                 setPendingArrears(prev => Math.max(0, parseInt(prev || 0) - parseInt(memberToRemove.pendingArrears || 0)));
                 setMembers(members.filter(m => m.id !== id));
@@ -500,28 +583,22 @@
                 const finalFee = groupFee ? parseInt(groupFee) : null;
                 const finalArrears = parseInt(pendingArrears || 0);
 
-                // Update primary student's personal details
                 const primaryRef = db.collection('students').doc(primaryStudent.id);
                 batch.update(primaryRef, { name: stName.toUpperCase(), studentClass: stClass, gender: stGender });
 
-                // Update ALL members in the group to share GroupId, Guardian, Phone, Fee, and Arrears
                 members.forEach(m => {
                     const docRef = db.collection('students').doc(m.id);
                     batch.update(docRef, {
-                        groupId: finalGroupId,
-                        guardian: guardian.toUpperCase(),
-                        phone: phone,
-                        groupFee: finalFee,
-                        pendingArrears: finalArrears
+                        groupId: finalGroupId, guardian: guardian.toUpperCase(), phone: phone,
+                        groupFee: finalFee, pendingArrears: finalArrears
                     });
                 });
 
-                // Check if any old members were removed from this group. If so, assign them a new solo group.
                 const originalMembers = allStudents.filter(s => s.groupId === primaryStudent.groupId);
                 originalMembers.forEach(om => {
                     if (!members.find(m => m.id === om.id)) {
                         const soloDocRef = db.collection('students').doc(om.id);
-                        batch.update(soloDocRef, { groupId: om.id, groupFee: null }); // Reset to solo
+                        batch.update(soloDocRef, { groupId: om.id, groupFee: null }); 
                     }
                 });
 
@@ -530,9 +607,8 @@
             };
 
             const searchResults = allStudents.filter(s => 
-                s.id !== primaryStudent.id && 
-                s.studentClass === searchClass && 
-                s.name.toLowerCase().includes(searchName.toLowerCase()) &&
+                s.id !== primaryStudent.id && s.studentClass === searchClass && 
+                (s.name || '').toLowerCase().includes(searchName.toLowerCase()) &&
                 !members.find(m => m.id === s.id)
             );
 
@@ -542,16 +618,14 @@
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full flex flex-col max-h-[90vh]">
                         <div className="bg-yellow-600 px-6 py-4 flex justify-between items-center text-white shrink-0">
-                            <h3 className="text-lg font-bold flex items-center"><Icons.Link /> Student & Family Group Setup</h3>
+                            <h3 className="text-lg font-bold flex items-center"><Icons.Link /> Student & Family Setup</h3>
                             <button onClick={onClose} className="hover:text-gray-200"><Icons.Close /></button>
                         </div>
                         
                         <div className="flex-1 overflow-y-auto p-6 bg-gray-50 flex flex-col lg:flex-row gap-6">
-                            
-                            {/* Left Side: Personal Info & Linking */}
                             <div className="flex-1 space-y-6">
                                 <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                                    <h4 className="font-bold text-gray-800 mb-3 border-b pb-2">Student Personal Details</h4>
+                                    <h4 className="font-bold text-gray-800 mb-3 border-b pb-2">Student Details</h4>
                                     <div className="grid grid-cols-3 gap-3">
                                         <div className="col-span-3"><label className="text-xs font-bold text-gray-500">Name</label><input type="text" className="w-full p-2 border rounded font-bold uppercase" value={stName} onChange={e => setStName(e.target.value)} required /></div>
                                         <div><label className="text-xs font-bold text-gray-500">Class</label><select className="w-full p-2 border rounded" value={stClass} onChange={e => setStClass(e.target.value)}>{CLASSES.map(c => <option key={c}>{c}</option>)}</select></div>
@@ -561,80 +635,52 @@
 
                                 <div className="bg-white p-4 rounded-lg shadow-sm border border-blue-200">
                                     <h4 className="font-bold text-blue-800 mb-3 border-b pb-2 flex justify-between">
-                                        <span>Link Siblings (Group Members)</span>
-                                        <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">{members.length} Members</span>
+                                        <span>Link Siblings</span><span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">{members.length} Members</span>
                                     </h4>
-                                    
-                                    {/* Link Search */}
                                     <div className="flex space-x-2 mb-4 bg-blue-50 p-3 rounded">
-                                        <select className="p-2 border rounded text-sm w-1/3" value={searchClass} onChange={e => setSearchClass(e.target.value)}>
-                                            <option value="">Select Class</option>
-                                            {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
-                                        </select>
-                                        <input type="text" placeholder="Search by name to link..." className="p-2 border rounded text-sm flex-1" value={searchName} onChange={e => setSearchName(e.target.value)} />
+                                        <select className="p-2 border rounded text-sm w-1/3" value={searchClass} onChange={e => setSearchClass(e.target.value)}><option value="">Class</option>{CLASSES.map(c => <option key={c} value={c}>{c}</option>)}</select>
+                                        <input type="text" placeholder="Search name..." className="p-2 border rounded text-sm flex-1" value={searchName} onChange={e => setSearchName(e.target.value)} />
                                     </div>
-                                    
                                     {searchName && searchClass && (
                                         <div className="mb-4 border border-green-200 rounded max-h-32 overflow-y-auto bg-green-50">
-                                            {searchResults.length === 0 ? <div className="p-2 text-sm text-gray-500">No matching unlinked students found.</div> : 
+                                            {searchResults.length === 0 ? <div className="p-2 text-sm text-gray-500">No matches found.</div> : 
                                                 searchResults.map(s => (
                                                     <div key={s.id} className="flex justify-between items-center p-2 border-b hover:bg-green-100">
-                                                        <span className="text-sm font-bold">{s.name} <span className="text-gray-500 font-normal">({s.phone})</span></span>
-                                                        <button type="button" onClick={() => handleAddSibling(s)} className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700">Add to Group</button>
+                                                        <span className="text-sm font-bold">{s.name}</span>
+                                                        <button type="button" onClick={() => handleAddSibling(s)} className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700">Add</button>
                                                     </div>
                                                 ))
                                             }
                                         </div>
                                     )}
-
-                                    {/* Member List */}
                                     <div className="space-y-2">
                                         {members.map(m => (
                                             <div key={m.id} className={`flex justify-between items-center p-2 rounded border ${m.id === primaryStudent.id ? 'bg-yellow-100 border-yellow-300' : 'bg-gray-50'}`}>
-                                                <div>
-                                                    <span className="font-bold">{m.name}</span> <span className="text-xs text-gray-500 bg-gray-200 px-1 rounded ml-1">Class {m.studentClass}</span>
-                                                    {m.id === primaryStudent.id && <span className="text-[10px] bg-yellow-400 text-yellow-900 px-1 rounded ml-2 font-bold uppercase">Current</span>}
-                                                </div>
-                                                {m.id !== primaryStudent.id && <button type="button" onClick={() => removeMember(m.id)} className="text-red-500 hover:text-red-700"><Icons.Close /></button>}
+                                                <div><span className="font-bold">{m.name}</span> <span className="text-xs text-gray-500 bg-gray-200 px-1 rounded ml-1">Class {m.studentClass}</span></div>
+                                                {m.id !== primaryStudent.id && <button type="button" onClick={() => removeMember(m.id)} className="text-red-500"><Icons.Close /></button>}
                                             </div>
                                         ))}
                                     </div>
-                                    <p className="text-[10px] text-gray-500 mt-2 leading-tight">All grouped members will share the same Guardian, Phone, Monthly Fee, and Arrears tracking.</p>
                                 </div>
                             </div>
 
-                            {/* Right Side: Shared Group Settings */}
                             <div className="flex-1 space-y-6">
                                 <div className="bg-white p-4 rounded-lg shadow-sm border border-yellow-300">
-                                    <h4 className="font-bold text-yellow-800 mb-3 border-b border-yellow-200 pb-2">Shared Family Details & Fee</h4>
-                                    
+                                    <h4 className="font-bold text-yellow-800 mb-3 border-b border-yellow-200 pb-2">Shared Group Details</h4>
                                     <div className="space-y-4">
-                                        <div>
-                                            <label className="block text-sm font-bold text-gray-700 mb-1">Guardian Name (Applied to all)</label>
-                                            <input type="text" className="w-full px-3 py-2 border rounded-md uppercase" value={guardian} onChange={e => setGuardian(e.target.value)} />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-bold text-gray-700 mb-1">Phone Number (Group ID)</label>
-                                            <input type="tel" className="w-full px-3 py-2 border rounded-md font-bold" value={phone} onChange={e => setPhone(e.target.value)} required />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-bold text-gray-700 mb-1">Group Pending Arrears (₹)</label>
-                                            <input type="number" min="0" className="w-full px-3 py-2 border rounded-md bg-red-50 text-red-700 font-bold" value={pendingArrears} onChange={e => setPendingArrears(e.target.value)} />
-                                            <p className="text-xs text-red-500 mt-1">If linking students, their previous arrears are summed up automatically.</p>
-                                        </div>
+                                        <div><label className="block text-sm font-bold text-gray-700 mb-1">Guardian Name</label><input type="text" className="w-full px-3 py-2 border rounded-md uppercase" value={guardian} onChange={e => setGuardian(e.target.value)} /></div>
+                                        <div><label className="block text-sm font-bold text-gray-700 mb-1">Phone Number (Group ID)</label><input type="tel" className="w-full px-3 py-2 border rounded-md font-bold" value={phone} onChange={e => setPhone(e.target.value)} /></div>
+                                        <div><label className="block text-sm font-bold text-gray-700 mb-1">Pending Arrears (₹)</label><input type="number" min="0" className="w-full px-3 py-2 border rounded-md bg-red-50 text-red-700 font-bold" value={pendingArrears} onChange={e => setPendingArrears(e.target.value)} /></div>
                                         
                                         <div className="bg-yellow-50 p-4 border border-yellow-400 rounded-lg">
-                                            <label className="block text-sm font-bold text-yellow-900 mb-1">Total Monthly Fee for Group (₹)</label>
+                                            <label className="block text-sm font-bold text-yellow-900 mb-1">Total Group Fee (₹)</label>
                                             <div className="flex items-center space-x-3">
                                                 <input type="number" min="0" placeholder={`Default: ₹${calculateDefaultFee()}`} className="flex-1 px-3 py-2 border-2 border-yellow-400 rounded-md text-lg font-bold" value={groupFee} onChange={e => setGroupFee(e.target.value)} />
-                                                <button type="button" onClick={() => setGroupFee('')} className="text-xs text-gray-500 underline">Reset to Default</button>
                                             </div>
-                                            <p className="text-xs text-yellow-700 mt-2 font-medium">Leave blank to use default (₹{calculateDefaultFee()}). Enter a value here to set a custom Concession for this entire family.</p>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-
                         </div>
                         <div className="bg-white px-6 py-4 border-t flex justify-between shrink-0">
                             <button type="button" onClick={async () => {
@@ -642,11 +688,10 @@
                                     await db.collection('students').doc(primaryStudent.id).delete();
                                     onClose();
                                 }
-                            }} className="text-red-600 hover:text-red-800 font-bold text-sm">Delete Student</button>
-                            
+                            }} className="text-red-600 font-bold text-sm">Delete Student</button>
                             <div className="space-x-3">
                                 <button type="button" onClick={onClose} className="px-4 py-2 border rounded-md hover:bg-gray-100 font-medium">Cancel</button>
-                                <button type="button" onClick={handleSave} className="px-6 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-md font-bold shadow-sm">Save Group & Details</button>
+                                <button type="button" onClick={handleSave} className="px-6 py-2 bg-yellow-600 text-white rounded-md font-bold shadow-sm">Save Group</button>
                             </div>
                         </div>
                     </div>
@@ -666,13 +711,10 @@
                 const paidAmount = parseInt(amount);
                 if (isNaN(paidAmount) || paidAmount <= 0) return alert("Valid amount required");
 
-                let arrearsAdded = 0;
-                let status = 'FULL';
-                
+                let arrearsAdded = 0; let status = 'FULL';
                 if (paidAmount < groupFee) { status = 'PARTIAL'; arrearsAdded = groupFee - paidAmount; } 
-                else if (paidAmount > groupFee) { arrearsAdded = groupFee - paidAmount; /* Negative, decreases arrears */ }
+                else if (paidAmount > groupFee) { arrearsAdded = groupFee - paidAmount; }
 
-                // Group arrears logic
                 let currentArrears = parseInt(members[0].pendingArrears || 0);
                 if (existingPayment && existingPayment.arrearsAdded) currentArrears -= existingPayment.arrearsAdded;
                 
@@ -680,20 +722,14 @@
 
                 const paymentData = {
                     amount: paidAmount, status: status, receipt: receipt,
-                    timestamp: new Date().toISOString(),
-                    arrearsAdded: Math.max(0, arrearsAdded),
-                    isSharedFamilyPayment: members.length > 1, // Crucial for accounting
-                    groupId: members[0].groupId
+                    timestamp: new Date().toISOString(), arrearsAdded: Math.max(0, arrearsAdded),
+                    isSharedFamilyPayment: members.length > 1, groupId: members[0].groupId
                 };
 
-                // Batch update ALL members in group identically
                 const batch = db.batch();
                 members.forEach(m => {
                     const docRef = db.collection('students').doc(m.id);
-                    batch.update(docRef, {
-                        [`payments.${month}`]: paymentData,
-                        pendingArrears: newArrears
-                    });
+                    batch.update(docRef, { [`payments.${month}`]: paymentData, pendingArrears: newArrears });
                 });
                 await batch.commit();
                 onClose();
@@ -704,10 +740,7 @@
                 const batch = db.batch();
                 members.forEach(m => {
                     const docRef = db.collection('students').doc(m.id);
-                    batch.update(docRef, {
-                        [`payments.${month}`]: firebase.firestore.FieldValue.delete(),
-                        pendingArrears: firebase.firestore.FieldValue.increment(arrearsToRevert)
-                    });
+                    batch.update(docRef, { [`payments.${month}`]: firebase.firestore.FieldValue.delete(), pendingArrears: firebase.firestore.FieldValue.increment(arrearsToRevert) });
                 });
                 await batch.commit();
                 onClose();
@@ -716,46 +749,25 @@
             return (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-lg shadow-xl max-w-md w-full overflow-hidden">
-                        <div className="bg-green-600 px-6 py-4 flex justify-between items-center text-white">
-                            <h3 className="text-lg font-bold">Group Payment - {month}</h3>
-                            <button onClick={onClose} className="hover:text-gray-200"><Icons.Close /></button>
-                        </div>
-                        
+                        <div className="bg-green-600 px-6 py-4 flex justify-between items-center text-white"><h3 className="text-lg font-bold">Payment - {month}</h3><button onClick={onClose}><Icons.Close /></button></div>
                         <form onSubmit={handleSave} className="p-6 space-y-4">
                             <div className="bg-gray-50 p-3 rounded border text-sm text-gray-700 mb-4">
-                                <p className="font-bold text-gray-900 border-b pb-1 mb-2">Paying for {members.length} Student(s):</p>
-                                <div className="space-y-1 mb-2 max-h-20 overflow-y-auto">
-                                    {members.map(m => <div key={m.id} className="text-xs">• {m.name} (Class {m.studentClass})</div>)}
-                                </div>
-                                <p className="text-lg font-bold text-green-800 mt-2 border-t pt-2">Total Due / Month: ₹{groupFee}</p>
+                                <p className="font-bold border-b pb-1 mb-2">Paying for {members.length} Student(s):</p>
+                                <div className="space-y-1 mb-2 max-h-20 overflow-y-auto">{members.map(m => <div key={m.id} className="text-xs">• {m.name}</div>)}</div>
+                                <p className="text-lg font-bold text-green-800 mt-2 border-t pt-2">Due: ₹{groupFee}</p>
                             </div>
-
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-1">Total Amount Paid (₹)</label>
-                                <input type="number" required min="1" className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 text-2xl font-bold" value={amount} onChange={e => setAmount(e.target.value)} />
-                                {amount < groupFee && amount > 0 && (
-                                    <p className="text-xs text-yellow-600 mt-2 flex items-center font-bold bg-yellow-50 p-2 rounded border border-yellow-200">
-                                        <span className="mr-1"><Icons.Warning /></span> Shortfall of ₹{groupFee - amount} will be added to Group Arrears.
-                                    </p>
-                                )}
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Paid (₹)</label>
+                                <input type="number" required min="1" className="w-full px-4 py-3 border rounded-md text-2xl font-bold" value={amount} onChange={e => setAmount(e.target.value)} />
                             </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Receipt Number</label>
-                                <input type="text" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-green-500 uppercase" value={receipt} onChange={e => setReceipt(e.target.value)} placeholder="e.g. REC-1024" />
-                            </div>
-
-                            <div className="pt-4 border-t flex justify-between items-center mt-6">
-                                {existingPayment ? <button type="button" onClick={() => setConfirmDel(true)} className="text-red-600 hover:bg-red-50 text-sm font-bold px-3 py-2 rounded">Delete Record</button> : <div></div>}
-                                <div className="space-x-3">
-                                    <button type="button" onClick={onClose} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-md font-medium">Cancel</button>
-                                    <button type="submit" className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md font-bold shadow-sm">Save Group Payment</button>
-                                </div>
+                            <div><label className="block text-sm font-medium">Receipt No</label><input type="text" className="w-full px-4 py-2 border rounded-md uppercase" value={receipt} onChange={e => setReceipt(e.target.value)} /></div>
+                            <div className="pt-4 flex justify-between mt-6">
+                                {existingPayment ? <button type="button" onClick={() => setConfirmDel(true)} className="text-red-600 font-bold px-3 py-2">Delete</button> : <div></div>}
+                                <div className="space-x-3"><button type="button" onClick={onClose} className="px-4 py-2 font-medium">Cancel</button><button type="submit" className="px-6 py-2 bg-green-600 text-white rounded-md font-bold">Save</button></div>
                             </div>
                         </form>
                     </div>
-
-                    <CustomConfirm isOpen={confirmDel} message="Delete this payment record? This will revert arrears for the entire family group." confirmText="Yes, Delete" onConfirm={handleDelete} onCancel={() => setConfirmDel(false)} />
+                    <CustomConfirm isOpen={confirmDel} message="Delete payment?" confirmText="Delete" onConfirm={handleDelete} onCancel={() => setConfirmDel(false)} />
                 </div>
             );
         };
@@ -778,10 +790,7 @@
                     <div className="bg-white p-8 rounded-xl shadow-md border border-gray-100">
                         <div className="flex items-center mb-6 border-b pb-4"><div className="p-3 bg-green-100 text-green-700 rounded-lg mr-4"><Icons.Settings /></div><div><h2 className="text-xl font-bold">Global Configuration</h2></div></div>
                         <form onSubmit={handleSave}>
-                            <div className="mb-6">
-                                <label className="block text-sm font-bold text-gray-700 mb-2">Default Base Fee (₹) [Per Student]</label>
-                                <input type="number" required min="0" className="w-full md:w-1/2 px-4 py-3 border border-gray-300 rounded-md focus:ring-green-500 text-lg font-bold" value={baseFee} onChange={e => setBaseFee(e.target.value)} />
-                            </div>
+                            <div className="mb-6"><label className="block text-sm font-bold mb-2">Default Base Fee (₹)</label><input type="number" required min="0" className="w-full md:w-1/2 px-4 py-3 border rounded-md text-lg font-bold" value={baseFee} onChange={e => setBaseFee(e.target.value)} /></div>
                             <button type="submit" disabled={saving} className="px-8 py-3 bg-green-600 hover:bg-green-700 rounded-md font-bold text-white transition-all">Save Config</button>
                         </form>
                     </div>
