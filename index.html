@@ -175,14 +175,15 @@
             return (
                 <div className="min-h-screen flex flex-col bg-gray-50">
                     <header className="bg-green-700 text-white shadow-md relative">
-                        <div className="max-w-full px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-                            <div className="flex items-center gap-3">
-                                {settings.logo ? <img src={settings.logo} className="w-12 h-12 rounded-full bg-white object-cover border-2 border-white" /> : <div className="w-12 h-12 rounded-full bg-green-900 flex items-center justify-center font-black">MF</div>}
-                                <div><h1 className="text-2xl font-bold">{settings.institutionName || 'Madrasa Fee Manager'}</h1><p className="text-xs text-green-100">{settings.institutionPlace || 'Fee Management System'} {settings.registerNumber ? `• Reg: ${settings.registerNumber}` : ''}</p></div>
-                            </div>
+                        <div className="max-w-full px-4 sm:px-6 lg:px-8 py-4 grid grid-cols-[auto_1fr_auto] items-center gap-3">
                             <button onClick={() => setMenuOpen(!menuOpen)} className="p-2 rounded-lg bg-green-800 hover:bg-green-900"><Icons.Menu /></button>
+                            <div className="text-center min-w-0">
+                                <h1 className="text-2xl font-bold truncate">{settings.institutionName || 'Madrasa Fee Manager'}</h1>
+                                <p className="text-xs text-green-100 truncate">{settings.institutionPlace || 'Fee Management System'} {settings.registerNumber ? `• Reg: ${settings.registerNumber}` : ''}</p>
+                            </div>
+                            {settings.logo ? <img src={settings.logo} className="w-12 h-12 rounded-full bg-white object-cover border-2 border-white justify-self-end" /> : <div className="w-12 h-12 rounded-full bg-green-900 flex items-center justify-center font-black justify-self-end">MF</div>}
                         </div>
-                        {menuOpen && <div className="absolute right-4 top-20 z-50 w-72 rounded-xl bg-white text-gray-800 shadow-2xl border overflow-hidden">
+                        {menuOpen && <div className="absolute left-4 top-20 z-50 w-72 rounded-xl bg-white text-gray-800 shadow-2xl border overflow-hidden">
                             {[['DASHBOARD','Dashboard',<Icons.Dashboard />],['STUDENTS','Student Management',<Icons.Users />],['SETTINGS','Settings',<Icons.Settings />]].map(([key,label,icon]) => <button key={key} onClick={() => { setActiveTab(key); setMenuOpen(false); }} className={`w-full flex items-center px-5 py-4 font-bold hover:bg-green-50 ${activeTab === key ? 'bg-green-100 text-green-800' : ''}`}>{icon}{label}</button>)}
                         </div>}
                     </header>
@@ -409,7 +410,7 @@
                                     <th className="px-3 py-2 text-center bg-yellow-50 text-yellow-800 border-r w-24">Group Setup</th>
                                     <th className="px-3 py-2 text-center bg-purple-50 text-purple-800 border-r w-24">Extra Fees</th>
                                     <th className="px-3 py-2 text-right text-red-600 w-20 border-r">Arrears</th>
-                                    {dynamicMonths.map(m => <th key={m} className="px-2 py-2 text-center border-r w-12">{m}</th>)}
+                                    {dynamicMonths.map(m => <th key={m} className="px-2 py-2 text-center border-r min-w-[110px]">{m}</th>)}
                                 </tr>
                             </thead>
                             <tbody>
@@ -465,29 +466,26 @@
                                                     {student.pendingArrears > 0 ? `₹${student.pendingArrears}` : '0'}
                                                 </td>
 
-                                                {/* Dynamic Months columns with Hover Detailed Tooltip */}
+                                                {/* Dynamic month columns with visible payment details */}
                                                 {dynamicMonths.map(month => {
                                                     const payment = student.payments?.[month];
+                                                    const balance = payment?.arrearsAdded || 0;
                                                     return (
-                                                        <td key={month} className={`px-1 py-1 border-r cursor-pointer transition-colors custom-tooltip relative ${payment ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-red-50'}`} onClick={() => openPaymentModal(groupMembers, month)}>
-                                                            <div className="flex flex-col items-center justify-center h-full">
-                                                                {!payment ? (
-                                                                    <span className="w-6 h-6 rounded-full bg-red-100 border border-red-300 flex items-center justify-center text-red-600 text-[10px] font-black">!</span>
-                                                                ) : (
-                                                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center ${payment.status === 'FULL' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'}`}>
-                                                                        {payment.status === 'FULL' ? <Icons.Check /> : <Icons.Warning />}
+                                                        <td key={month} className={`px-1.5 py-1 border-r cursor-pointer transition-colors min-w-[110px] ${payment ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-red-50'}`} onClick={() => openPaymentModal(groupMembers, month)}>
+                                                            {!payment ? (
+                                                                <div className="min-h-[52px] flex flex-col items-center justify-center text-red-600">
+                                                                    <span className="w-6 h-6 rounded-full bg-red-100 border border-red-300 flex items-center justify-center text-[10px] font-black">!</span>
+                                                                    <span className="text-[10px] font-bold mt-1">Not Paid</span>
+                                                                </div>
+                                                            ) : (
+                                                                <div className={`rounded-lg border p-1.5 text-[10px] leading-tight whitespace-normal shadow-sm ${payment.status === 'FULL' ? 'bg-green-100 border-green-300 text-green-900' : 'bg-yellow-50 border-yellow-300 text-yellow-900'}`}>
+                                                                    <div className="flex items-center justify-center gap-1 font-black text-[11px] mb-1">
+                                                                        {payment.status === 'FULL' ? <span className="text-green-700">✓ Paid</span> : <span className="text-yellow-800">Partial</span>}
                                                                     </div>
-                                                                )}
-                                                            </div>
-                                                            {/* Custom Hover Tooltip */}
-                                                            {payment && (
-                                                                <div className="tooltip-text invisible opacity-0 absolute z-50 bg-gray-900 text-white text-[11px] rounded p-2 bottom-full mb-1 left-1/2 transform -translate-x-1/2 w-40 transition-opacity shadow-lg whitespace-normal leading-tight">
-                                                                    <div className="font-bold border-b border-gray-700 pb-1 mb-1 text-center">{month} Payment</div>
-                                                                    <div><span className="text-gray-400">Date:</span> {payment.date}</div>
-                                                                    <div><span className="text-gray-400">Paid:</span> ₹{payment.amount}</div>
-                                                                    <div><span className="text-gray-400">Balance:</span> ₹{payment.arrearsAdded || 0}</div>
-                                                                    {payment.arrearsAdded > 0 && <div className="text-red-300"><span className="text-gray-400">Arrears Added:</span> ₹{payment.arrearsAdded}</div>}
-                                                                    <div><span className="text-gray-400">Rec:</span> {payment.receipt || 'N/A'}</div>
+                                                                    <div className="font-bold">Date: {payment.date || '-'}</div>
+                                                                    <div className="font-bold">Rec: {payment.receipt || 'N/A'}</div>
+                                                                    <div>Paid: ₹{payment.amount || 0}</div>
+                                                                    {balance > 0 && <div className="text-red-700 font-black">Bal: ₹{balance}</div>}
                                                                 </div>
                                                             )}
                                                         </td>
