@@ -381,10 +381,10 @@ const { useState, useEffect, useMemo, useRef } = React;
                     const arrears = parseInt(student.pendingArrears || 0);
                     const monthValues = dynamicMonths.map(month => {
                         const payment = student.payments?.[month];
-                        if (!payment) return 'Not Paid';
+                        if (!payment) return '-';
                         const balance = payment.balance ?? payment.arrearsAdded ?? 0;
                         const credit = payment.credit || 0;
-                        return [`Paid: ${payment.amount || 0}`, payment.receipt ? `Rec: ${payment.receipt}` : '', payment.date ? `Date: ${payment.date}` : '', balance > 0 ? `Bal: ${balance}` : '', credit > 0 ? `Credit: ${credit}` : ''].filter(Boolean).join('\n');
+                        return [payment.receipt || String(payment.amount || 0), balance > 0 ? `Bal: ${balance}` : '', credit > 0 ? `Credit: ${credit}` : ''].filter(Boolean).join('\n');
                     });
                     return { idx: idx + 1, classText, nameText, guardian: student.guardian || '-', phone: student.phone || '-', groupFee, totalExFee, dueExFee, arrears, monthValues };
                 });
@@ -407,15 +407,32 @@ const { useState, useEffect, useMemo, useRef } = React;
                 doc.setFontSize(14);
                 doc.text(title, 40, 30);
                 if (subtitle) { doc.setFontSize(9); doc.text(subtitle, 40, 46); }
+                const firstMonthColumn = columns.length - dynamicMonths.length;
                 doc.autoTable({
                     head: [columns],
                     body: rows,
                     startY: subtitle ? 58 : 48,
-                    styles: { fontSize: 6, cellPadding: 2, overflow: 'linebreak', valign: 'top' },
-                    headStyles: { fillColor: [22, 101, 52], textColor: 255, fontStyle: 'bold' },
+                    theme: 'grid',
+                    styles: { fontSize: 6, cellPadding: 2, overflow: 'linebreak', valign: 'top', lineColor: [75, 85, 99], lineWidth: 0.35 },
+                    headStyles: { fillColor: [22, 101, 52], textColor: 255, fontStyle: 'bold', lineColor: [31, 41, 55], lineWidth: 0.5 },
                     alternateRowStyles: { fillColor: [248, 250, 252] },
                     columnStyles: { 0: { cellWidth: 24 }, 1: { cellWidth: 34 }, 2: { cellWidth: 90 }, 3: { cellWidth: 70 }, 4: { cellWidth: 55 }, 5: { cellWidth: 42 }, 6: { cellWidth: 42 }, 7: { cellWidth: 42 }, 8: { cellWidth: 38 } },
                     margin: { left: 18, right: 18 },
+                    didParseCell: (data) => {
+                        if (data.section === 'body' && data.column.index >= firstMonthColumn) {
+                            const value = String(data.cell.raw || '');
+                            if (value === '-') {
+                                data.cell.styles.fillColor = [254, 226, 226];
+                                data.cell.styles.textColor = [153, 27, 27];
+                                data.cell.styles.halign = 'center';
+                                data.cell.styles.fontStyle = 'bold';
+                            } else {
+                                data.cell.styles.fillColor = [220, 252, 231];
+                                data.cell.styles.textColor = [20, 83, 45];
+                                data.cell.styles.fontStyle = 'bold';
+                            }
+                        }
+                    },
                     didDrawPage: () => {
                         const pageSize = doc.internal.pageSize;
                         doc.setFontSize(7);
