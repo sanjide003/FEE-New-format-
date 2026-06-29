@@ -230,17 +230,42 @@ const { useState, useEffect, useMemo, useRef } = React;
                     });
                 }
 
+                const classIndex = (student) => {
+                    const idx = CLASSES.indexOf(student.studentClass);
+                    return idx === -1 ? 999 : idx;
+                };
+                const groupMembersSorted = (student) => getGroupMembers(student.groupId).sort((a, b) => classIndex(a) - classIndex(b) || (a.name || '').localeCompare(b.name || ''));
+                const groupLeadIndex = (student) => classIndex(groupMembersSorted(student)[0] || student);
+                const genderRank = (student) => {
+                    if (genderSort === 'BOYS_FIRST' || genderSort === 'CLASS_BOYS_GIRLS') return student.gender === 'M' ? 0 : 1;
+                    if (genderSort === 'GIRLS_FIRST') return student.gender === 'F' ? 0 : 1;
+                    return 0;
+                };
+                const admissionNo = (student) => parseInt(student.profile?.admNo) || 999999;
+
                 result.sort((a, b) => {
-                    if (genderSort === 'BOYS_FIRST' && a.gender !== b.gender) return a.gender === 'M' ? -1 : 1;
-                    if (genderSort === 'GIRLS_FIRST' && a.gender !== b.gender) return a.gender === 'F' ? -1 : 1;
-                    if (sortOption === 'CLASS_DESC') {
-                        const idxA = CLASSES.indexOf(a.studentClass); const idxB = CLASSES.indexOf(b.studentClass);
-                        if (idxA !== idxB) return idxA - idxB;
+                    if (sortOption === 'CLASS_DESC' || sortOption === 'CLASS_ASC') {
+                        const dir = sortOption === 'CLASS_DESC' ? 1 : -1;
+                        const groupDiff = (groupLeadIndex(a) - groupLeadIndex(b)) * dir;
+                        if (groupDiff) return groupDiff;
+
+                        if (a.groupId === b.groupId) {
+                            const memberDiff = classIndex(a) - classIndex(b);
+                            if (memberDiff) return memberDiff;
+                        } else {
+                            const ownClassDiff = (classIndex(a) - classIndex(b)) * dir;
+                            if (ownClassDiff) return ownClassDiff;
+                        }
+
+                        const genderDiff = genderRank(a) - genderRank(b);
+                        if (genderDiff) return genderDiff;
                         return (a.name || '').localeCompare(b.name || '');
                     }
+
+                    if ((genderSort === 'BOYS_FIRST' || genderSort === 'GIRLS_FIRST') && a.gender !== b.gender) return genderRank(a) - genderRank(b);
                     if (sortOption === 'NAME_ASC') return (a.name || '').localeCompare(b.name || '');
                     if (sortOption === 'NAME_DESC') return (b.name || '').localeCompare(a.name || '');
-                    if (sortOption === 'ADM_NO') return (parseInt(a.profile?.admNo) || 999999) - (parseInt(b.profile?.admNo) || 999999);
+                    if (sortOption === 'ADM_NO') return admissionNo(a) - admissionNo(b);
                     return 0;
                 });
                 return result;
@@ -299,8 +324,8 @@ const { useState, useEffect, useMemo, useRef } = React;
                 setFamilyModalOpen(true);
             };
 
-            const openPaymentModal = (groupMembers, month) => {
-                const groupFee = groupMembers[0]?.groupFee || (groupMembers.length * settings.globalBaseFee);
+            const openPaymentModal = (groupMembers, month, feeOverride = null) => {
+                const groupFee = feeOverride ?? (groupMembers[0]?.groupFee || (groupMembers.length * settings.globalBaseFee));
                 const existingPayment = groupMembers[0]?.payments?.[month]; 
                 setPaymentGroupData({ members: groupMembers, month, groupFee, existingPayment });
                 setPaymentModalOpen(true);
@@ -349,7 +374,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                     }
                     const groupFee = groupMembers[0]?.groupFee || (groupMembers.length * settings.globalBaseFee);
                     const balance = payment?.arrearsAdded || 0;
-                    cells.push(<td key={month} className={`px-1.5 py-1 border-r cursor-pointer transition-colors min-w-[110px] ${payment ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-red-50'}`} onClick={() => openPaymentModal(groupMembers, month)}><div className="relative"><input type="checkbox" checked={isMonthSelected(groupMembers[0]?.groupId, month)} onChange={(e) => toggleMonthSelection(e, groupMembers, month, groupFee)} onClick={(e) => e.stopPropagation()} className="absolute -top-0.5 -left-0.5 w-3 h-3 accent-green-700" />{!payment ? <div className="min-h-[52px] flex flex-col items-center justify-center text-red-600 pt-2"><span className="w-6 h-6 rounded-full bg-red-100 border border-red-300 flex items-center justify-center text-[10px] font-black">!</span><span className="text-[10px] font-bold mt-1">Not Paid</span></div> : <div className={`rounded-lg border p-1.5 text-[10px] leading-tight whitespace-normal shadow-sm ${payment.status === 'FULL' ? 'bg-green-100 border-green-300 text-green-900' : 'bg-yellow-50 border-yellow-300 text-yellow-900'}`}><div className="flex items-center justify-center gap-1 font-black text-[11px] mb-1">{payment.status === 'FULL' ? <span className="text-green-700">✓ Paid</span> : <span className="text-yellow-800">Partial</span>}</div><div className="font-bold">Date: {payment.date || '-'}</div><div className="font-bold">Rec: {payment.receipt || 'N/A'}</div><div>Paid: ₹{payment.amount || 0}</div>{balance > 0 && <div className="text-red-700 font-black">Bal: ₹{balance}</div>}</div>}</div></td>);
+                    cells.push(<td key={month} className={`px-1.5 py-1 border-r cursor-pointer transition-colors min-w-[110px] ${payment ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-red-50'}`} onClick={() => openPaymentModal(groupMembers, month)}><div className="relative"><input type="checkbox" checked={isMonthSelected(groupMembers[0]?.groupId, month)} onChange={(e) => toggleMonthSelection(e, groupMembers, month, groupFee)} onClick={(e) => e.stopPropagation()} className="absolute -top-0.5 -left-0.5 w-3 h-3 accent-green-700" />{!payment ? <div className="min-h-[52px] flex flex-col items-center justify-center text-red-600 pt-2"><span className="w-6 h-6 rounded-full bg-red-100 border border-red-300 flex items-center justify-center text-[10px] font-black">!</span><span className="text-[10px] font-bold mt-1">Not Paid</span>{groupMembers.length > 1 && <button type="button" onClick={(e) => { e.stopPropagation(); openPaymentModal([student], month, settings.globalBaseFee); }} className="mt-1 rounded bg-yellow-100 px-1.5 py-0.5 text-[9px] font-black text-yellow-900 hover:bg-yellow-200">Separate</button>}</div> : <div className={`rounded-lg border p-1.5 text-[10px] leading-tight whitespace-normal shadow-sm ${payment.status === 'FULL' ? 'bg-green-100 border-green-300 text-green-900' : 'bg-yellow-50 border-yellow-300 text-yellow-900'}`}><div className="flex items-center justify-center gap-1 font-black text-[11px] mb-1">{payment.status === 'FULL' ? <span className="text-green-700">✓ Paid</span> : <span className="text-yellow-800">Partial</span>}</div><div className="font-bold">Date: {payment.date || '-'}</div><div className="font-bold">Rec: {payment.receipt || 'N/A'}</div><div>Paid: ₹{payment.amount || 0}</div>{groupMembers.length > 1 && <button type="button" onClick={(e) => { e.stopPropagation(); openPaymentModal([student], month, settings.globalBaseFee); }} className="mt-1 w-full rounded bg-yellow-100 px-1 py-0.5 text-[9px] font-black text-yellow-900 hover:bg-yellow-200">Separate</button>}{balance > 0 && <div className="text-red-700 font-black">Bal: ₹{balance}</div>}</div>}</div></td>);
                     i++;
                 }
                 return cells;
@@ -370,10 +395,10 @@ const { useState, useEffect, useMemo, useRef } = React;
                                 {CLASSES.map(c => <option key={c} value={c}>Class {c}</option>)}
                             </select>
                             <select className="px-2 py-1.5 border rounded text-sm bg-white" value={sortOption} onChange={e => { setSortOption(e.target.value); setCurrentPage(1); }}>
-                                <option value="CLASS_DESC">Sort: Class (+2 to 1)</option><option value="NAME_ASC">Sort: Name (A-Z)</option><option value="NAME_DESC">Sort: Name (Z-A)</option><option value="ADM_NO">Sort: Admission No.</option>
+                                <option value="CLASS_ASC">Sort: Class (1 to +2)</option><option value="CLASS_DESC">Sort: Class (+2 to 1)</option><option value="NAME_ASC">Sort: Name (A-Z)</option><option value="NAME_DESC">Sort: Name (Z-A)</option><option value="ADM_NO">Sort: Admission No.</option>
                             </select>
                             <select className="px-2 py-1.5 border rounded text-sm bg-white" value={genderSort} onChange={e => { setGenderSort(e.target.value); setCurrentPage(1); }}>
-                                <option value="MIXED">Gender: Mixed</option><option value="BOYS_FIRST">Boys First</option><option value="GIRLS_FIRST">Girls First</option>
+                                <option value="MIXED">Gender: Mixed</option><option value="BOYS_FIRST">Boys First</option><option value="GIRLS_FIRST">Girls First</option><option value="CLASS_BOYS_GIRLS">Class-wise Boys, Girls</option>
                             </select>
                             <select className="px-2 py-1.5 border rounded text-sm bg-white font-medium text-blue-700" value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setCurrentPage(1); }}>
                                 <option value="ALL">Status: All</option><option value="CONCESSION">Concessions Only</option><option value="GROUPED">Grouped Siblings</option><option value="ARREARS">Pending Arrears</option>
@@ -461,6 +486,12 @@ const { useState, useEffect, useMemo, useRef } = React;
                                                     <button onClick={() => { setSelectedFamilyStudent(student); setGroupOnlyMode(true); setFamilyModalOpen(true); }} className={`w-full flex items-center justify-center px-1 py-1 bg-white border rounded font-bold shadow-sm transition-all text-[11px] tracking-wide ${hasConcession ? 'border-yellow-400 text-yellow-900 bg-yellow-50' : 'border-gray-200 text-gray-700 hover:border-yellow-300'}`}>
                                                         {isGroup && <Icons.Link />} ₹{actualFee} {isGroup ? `(${groupMembers.length})` : ''}
                                                     </button>
+                                                    {isGroup && <div className="mt-1 text-left bg-white border border-yellow-100 rounded p-1 space-y-1">
+                                                        {groupMembers.sort((a, b) => CLASSES.indexOf(a.studentClass) - CLASSES.indexOf(b.studentClass)).map((member, memberIdx) => <div key={member.id} className={`flex items-center justify-between gap-1 text-[10px] ${member.id === student.id ? 'font-black text-yellow-900' : 'text-gray-600'}`}>
+                                                            <span className="truncate">{memberIdx + 1}. Cls {member.studentClass} - {member.name}</span>
+                                                            <button type="button" onClick={() => openPaymentModal([member], dynamicMonths[0], settings.globalBaseFee)} className="shrink-0 px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-900 font-bold hover:bg-yellow-200">Solo</button>
+                                                        </div>)}
+                                                    </div>}
                                                 </td>
 
                                                 <td className="px-2 py-2 border-r text-center bg-purple-50/20">
