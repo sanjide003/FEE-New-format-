@@ -187,8 +187,6 @@ const { useState, useEffect, useMemo, useRef } = React;
             const [genderSort, setGenderSort] = useState('MIXED');
             const [statusFilter, setStatusFilter] = useState('ALL');
 
-            const [perPage, setPerPage] = useState(30);
-            const [currentPage, setCurrentPage] = useState(1);
             
             const [familyModalOpen, setFamilyModalOpen] = useState(false);
             const [selectedFamilyStudent, setSelectedFamilyStudent] = useState(null);
@@ -270,9 +268,6 @@ const { useState, useEffect, useMemo, useRef } = React;
                 });
                 return result;
             }, [students, search, classFilter, statusFilter, sortOption, genderSort, settings.globalBaseFee]);
-
-            const totalPages = Math.ceil(filteredStudents.length / perPage);
-            const paginatedStudents = filteredStudents.slice((currentPage - 1) * perPage, currentPage * perPage);
 
             const triggerFileUpload = () => {
                 if (!selectedUploadClass) return showAlert("Please select a Target Class before uploading CSV.", "Upload Error");
@@ -386,24 +381,24 @@ const { useState, useEffect, useMemo, useRef } = React;
                     <div className="flex flex-col lg:flex-row justify-between items-center gap-3 bg-gray-50 p-4 rounded-lg border">
                         <div className="flex items-center space-x-2 w-full lg:w-1/4 relative">
                             <Icons.Search />
-                            <input type="text" placeholder="Search..." className="w-full px-3 py-1.5 border rounded focus:ring-green-500 outline-none text-sm" value={search} onChange={e => { setSearch(e.target.value); setCurrentPage(1); }} />
+                            <input type="text" placeholder="Search..." className="w-full px-3 py-1.5 border rounded focus:ring-green-500 outline-none text-sm" value={search} onChange={e => setSearch(e.target.value)} />
                         </div>
                         
                         <div className="flex flex-wrap items-center gap-2">
-                            <select className="px-2 py-1.5 border rounded text-sm bg-white" value={classFilter} onChange={e => { setClassFilter(e.target.value); setCurrentPage(1); }}>
+                            <select className="px-2 py-1.5 border rounded text-sm bg-white" value={classFilter} onChange={e => setClassFilter(e.target.value)}>
                                 <option value="">Filter: All Classes</option>
                                 {CLASSES.map(c => <option key={c} value={c}>Class {c}</option>)}
                             </select>
-                            <select className="px-2 py-1.5 border rounded text-sm bg-white" value={sortOption} onChange={e => { setSortOption(e.target.value); setCurrentPage(1); }}>
+                            <select className="px-2 py-1.5 border rounded text-sm bg-white" value={sortOption} onChange={e => setSortOption(e.target.value)}>
                                 <option value="CLASS_ASC">Sort: Class (1 to +2)</option><option value="CLASS_DESC">Sort: Class (+2 to 1)</option><option value="NAME_ASC">Sort: Name (A-Z)</option><option value="NAME_DESC">Sort: Name (Z-A)</option><option value="ADM_NO">Sort: Admission No.</option>
                             </select>
-                            <select className="px-2 py-1.5 border rounded text-sm bg-white" value={genderSort} onChange={e => { setGenderSort(e.target.value); setCurrentPage(1); }}>
+                            <select className="px-2 py-1.5 border rounded text-sm bg-white" value={genderSort} onChange={e => setGenderSort(e.target.value)}>
                                 <option value="MIXED">Gender: Mixed</option><option value="BOYS_FIRST">Boys First</option><option value="GIRLS_FIRST">Girls First</option><option value="CLASS_BOYS_GIRLS">Class-wise Boys, Girls</option>
                             </select>
-                            <select className="px-2 py-1.5 border rounded text-sm bg-white font-medium text-blue-700" value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setCurrentPage(1); }}>
+                            <select className="px-2 py-1.5 border rounded text-sm bg-white font-medium text-blue-700" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
                                 <option value="ALL">Status: All</option><option value="CONCESSION">Concessions Only</option><option value="GROUPED">Grouped Siblings</option><option value="ARREARS">Pending Arrears</option>
                             </select>
-                            <button onClick={() => { setSearch(''); setClassFilter(''); setSortOption('CLASS_DESC'); setGenderSort('MIXED'); setStatusFilter('ALL'); setCurrentPage(1); }} className="px-3 py-1.5 rounded bg-gray-700 text-white text-sm font-bold hover:bg-gray-800">Clear</button>
+                            <button onClick={() => { setSearch(''); setClassFilter(''); setSortOption('CLASS_DESC'); setGenderSort('MIXED'); setStatusFilter('ALL'); }} className="px-3 py-1.5 rounded bg-gray-700 text-white text-sm font-bold hover:bg-gray-800">Clear</button>
 
                             <div className="border-l border-gray-300 mx-1 h-6 hidden xl:block"></div>
 
@@ -446,12 +441,14 @@ const { useState, useEffect, useMemo, useRef } = React;
                                 </tr>
                             </thead>
                             <tbody>
-                                {paginatedStudents.length === 0 ? (
+                                {filteredStudents.length === 0 ? (
                                     <tr><td colSpan={7 + dynamicMonths.length} className="text-center py-8 text-gray-500">No students match the current filters.</td></tr>
                                 ) : (
-                                    paginatedStudents.map((student, idx) => {
+                                    filteredStudents.map((student, idx) => {
                                         const groupMembers = getGroupMembers(student.groupId);
+                                        const groupMembersByClass = [...groupMembers].sort((a, b) => CLASSES.indexOf(a.studentClass) - CLASSES.indexOf(b.studentClass));
                                         const isGroup = groupMembers.length > 1;
+                                        const showGuardian = !isGroup || groupMembersByClass[0]?.id === student.id;
                                         const actualFee = student.groupFee || (groupMembers.length * settings.globalBaseFee);
                                         const hasConcession = student.groupFee !== null && student.groupFee !== (groupMembers.length * settings.globalBaseFee);
                                         
@@ -463,7 +460,7 @@ const { useState, useEffect, useMemo, useRef } = React;
 
                                         return (
                                             <tr key={student.id} className="bg-white border-b hover:bg-green-50 transition-colors">
-                                                <td className="px-3 py-2 text-gray-500 text-xs">{(currentPage - 1) * perPage + idx + 1}</td>
+                                                <td className="px-3 py-2 text-gray-500 text-xs">{idx + 1}</td>
                                                 <td className="px-3 py-2 font-bold">{student.studentClass}</td>
                                                 
                                                 <td className="px-3 py-2">
@@ -477,8 +474,10 @@ const { useState, useEffect, useMemo, useRef } = React;
 
                                                 <td className="px-3 py-2 border-r">
                                                     <div className="flex flex-col leading-tight">
-                                                        <span className="font-semibold text-gray-800 text-xs truncate max-w-[160px]">{student.guardian || '-'}</span>
-                                                        <span className="text-[11px] text-gray-500 font-medium tracking-wide mt-0.5">{student.phone || '-'}</span>
+                                                        {showGuardian ? <>
+                                                            <span className="font-semibold text-gray-800 text-xs truncate max-w-[160px]">{student.guardian || '-'}</span>
+                                                            <span className="text-[11px] text-gray-500 font-medium tracking-wide mt-0.5">{student.phone || '-'}</span>
+                                                        </> : <span className="text-[11px] text-gray-400 italic">Same group guardian</span>}
                                                     </div>
                                                 </td>
                                                 
@@ -486,12 +485,6 @@ const { useState, useEffect, useMemo, useRef } = React;
                                                     <button onClick={() => { setSelectedFamilyStudent(student); setGroupOnlyMode(true); setFamilyModalOpen(true); }} className={`w-full flex items-center justify-center px-1 py-1 bg-white border rounded font-bold shadow-sm transition-all text-[11px] tracking-wide ${hasConcession ? 'border-yellow-400 text-yellow-900 bg-yellow-50' : 'border-gray-200 text-gray-700 hover:border-yellow-300'}`}>
                                                         {isGroup && <Icons.Link />} ₹{actualFee} {isGroup ? `(${groupMembers.length})` : ''}
                                                     </button>
-                                                    {isGroup && <div className="mt-1 text-left bg-white border border-yellow-100 rounded p-1 space-y-1">
-                                                        {groupMembers.sort((a, b) => CLASSES.indexOf(a.studentClass) - CLASSES.indexOf(b.studentClass)).map((member, memberIdx) => <div key={member.id} className={`flex items-center justify-between gap-1 text-[10px] ${member.id === student.id ? 'font-black text-yellow-900' : 'text-gray-600'}`}>
-                                                            <span className="truncate">{memberIdx + 1}. Cls {member.studentClass} - {member.name}</span>
-                                                            <button type="button" onClick={() => openPaymentModal([member], dynamicMonths[0], settings.globalBaseFee)} className="shrink-0 px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-900 font-bold hover:bg-yellow-200">Solo</button>
-                                                        </div>)}
-                                                    </div>}
                                                 </td>
 
                                                 <td className="px-2 py-2 border-r text-center bg-purple-50/20">
@@ -514,18 +507,6 @@ const { useState, useEffect, useMemo, useRef } = React;
                             </tbody>
                         </table>
                     </div>
-
-                    {/* Pagination */}
-                    {totalPages > 1 && (
-                        <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border">
-                            <span className="text-xs font-medium text-gray-500">Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, filteredStudents.length)} of {filteredStudents.length}</span>
-                            <div className="flex space-x-2 text-sm">
-                                <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="px-3 py-1 border rounded bg-white disabled:opacity-50 hover:bg-gray-100 font-medium">Prev</button>
-                                <span className="px-3 py-1 font-bold text-gray-700">Page {currentPage} of {totalPages}</span>
-                                <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="px-3 py-1 border rounded bg-white disabled:opacity-50 hover:bg-gray-100 font-medium">Next</button>
-                            </div>
-                        </div>
-                    )}
 
                     {familyModalOpen && <FamilySetupModal primaryStudent={selectedFamilyStudent} allStudents={students} globalBaseFee={settings.globalBaseFee} groupOnly={groupOnlyMode} onClose={() => setFamilyModalOpen(false)} showAlert={showAlert}/>}
                     {paymentModalOpen && <GroupPaymentModal context={paymentGroupData} onClose={() => setPaymentModalOpen(false)} showAlert={showAlert}/>}
