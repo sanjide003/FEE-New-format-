@@ -5,3 +5,7 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-
         ::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
         .table-container { overflow-x: auto; }
         .custom-tooltip:hover .tooltip-text { visibility: visible; opacity: 1; }
+
+.app-header { position: sticky; top: 0; z-index: 60; }
+.student-controls { position: sticky; top: 80px; z-index: 50; }
+.student-table-head { position: sticky; top: 160px; z-index: 40; }

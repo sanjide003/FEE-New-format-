@@ -124,7 +124,7 @@ const { useState, useEffect, useMemo, useRef } = React;
 
             return (
                 <div className="min-h-screen flex flex-col bg-gray-50">
-                    <header className="bg-green-700 text-white shadow-md relative">
+                    <header className="app-header bg-green-700 text-white shadow-md relative">
                         <div className="max-w-full px-4 sm:px-6 lg:px-8 py-4 grid grid-cols-[auto_1fr_auto] items-center gap-3">
                             <button onClick={() => setMenuOpen(!menuOpen)} className="p-2 rounded-lg bg-green-800 hover:bg-green-900"><Icons.Menu /></button>
                             <div className="text-center min-w-0">
@@ -234,7 +234,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                     return idx === -1 ? 999 : idx;
                 };
                 const groupMembersSorted = (student) => getGroupMembers(student.groupId).sort((a, b) => classIndex(a) - classIndex(b) || (a.name || '').localeCompare(b.name || ''));
-                const groupLeadIndex = (student) => classIndex(groupMembersSorted(student)[0] || student);
+                const groupLeadIndex = (student) => classFilter ? classIndex(student) : classIndex(groupMembersSorted(student)[0] || student);
                 const genderRank = (student) => {
                     if (genderSort === 'BOYS_FIRST' || genderSort === 'CLASS_BOYS_GIRLS') return student.gender === 'M' ? 0 : 1;
                     if (genderSort === 'GIRLS_FIRST') return student.gender === 'F' ? 0 : 1;
@@ -400,7 +400,7 @@ const { useState, useEffect, useMemo, useRef } = React;
             return (
                 <div className="flex flex-col space-y-4">
                     {/* Top Controls */}
-                    <div className="flex flex-col lg:flex-row justify-between items-center gap-3 bg-gray-50 p-4 rounded-lg border">
+                    <div className="student-controls flex flex-col lg:flex-row justify-between items-center gap-3 bg-gray-50 p-4 rounded-lg border">
                         <div className="flex items-center space-x-2 w-full lg:w-1/4 relative">
                             <Icons.Search />
                             <input type="text" placeholder="Search..." className="w-full px-3 py-1.5 border rounded focus:ring-green-500 outline-none text-sm" value={search} onChange={e => setSearch(e.target.value)} />
@@ -453,7 +453,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                     {/* Data Table */}
                     <div className="table-container border rounded-lg shadow-sm bg-white">
                         <table className="min-w-full text-sm text-left whitespace-nowrap">
-                            <thead className="text-xs text-gray-700 uppercase bg-gray-100 sticky top-0 z-10 shadow-sm border-b">
+                            <thead className="student-table-head text-xs text-gray-700 uppercase bg-gray-100 shadow-sm border-b">
                                 <tr>
                                     <th className="px-3 py-2 w-10">No</th>
                                     <th className="px-3 py-2 w-14">Class</th>
