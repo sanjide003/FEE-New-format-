@@ -419,9 +419,9 @@ const { useState, useEffect, useMemo, useRef } = React;
                 });
 
                 const pageWidth = doc.internal.pageSize.getWidth();
-                doc.setFontSize(14);
+                doc.setFontSize(13);
                 doc.text(title, pageWidth / 2, 30, { align: 'center' });
-                if (subtitle) { doc.setFontSize(9); doc.text(subtitle, pageWidth / 2, 46, { align: 'center' }); }
+                if (subtitle) { doc.setFontSize(8); doc.text(subtitle, pageWidth / 2, 46, { align: 'center' }); }
                 if (settings.logo) {
                     try {
                         const logoData = await loadImageAsDataUrl(settings.logo);
@@ -431,16 +431,16 @@ const { useState, useEffect, useMemo, useRef } = React;
                     }
                 }
                 const firstMonthColumn = columns.length - dynamicMonths.length;
-                const pdfColumnStyles = { 0: { cellWidth: 24, halign: 'center' }, 1: { cellWidth: 34, halign: 'center' }, 2: { cellWidth: 90 }, 3: { cellWidth: 70 }, 4: { cellWidth: 55, halign: 'center' }, 5: { cellWidth: 42, halign: 'center' } };
+                const pdfColumnStyles = { 0: { cellWidth: 24, halign: 'center' }, 1: { cellWidth: 34, halign: 'center' }, 2: { cellWidth: 82 }, 3: { cellWidth: 62 }, 4: { cellWidth: 50, halign: 'center' }, 5: { cellWidth: 38, halign: 'center' } };
                 columns.forEach((_, columnIndex) => {
-                    if (columnIndex >= firstMonthColumn) pdfColumnStyles[columnIndex] = { cellWidth: 32, halign: 'center' };
+                    if (columnIndex >= firstMonthColumn) pdfColumnStyles[columnIndex] = { cellWidth: 30, halign: 'center' };
                 });
                 doc.autoTable({
                     head: [columns],
                     body: rows,
                     startY: 70,
                     theme: 'grid',
-                    styles: { fontSize: 6, cellPadding: 2, overflow: 'linebreak', valign: 'top', lineColor: [75, 85, 99], lineWidth: 0.35 },
+                    styles: { fontSize: 7, cellPadding: 1.6, overflow: 'linebreak', valign: 'top', lineColor: [75, 85, 99], lineWidth: 0.35 },
                     headStyles: { fillColor: [0, 0, 0], textColor: 255, fontStyle: 'bold', lineColor: [0, 0, 0], lineWidth: 0.5 },
                     alternateRowStyles: { fillColor: [255, 255, 255] },
                     columnStyles: pdfColumnStyles,
