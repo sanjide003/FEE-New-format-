@@ -381,7 +381,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                     const arrears = parseInt(student.pendingArrears || 0);
                     const monthValues = dynamicMonths.map(month => {
                         const payment = student.payments?.[month];
-                        if (!payment) return '-';
+                        if (!payment) return '---';
                         const balance = payment.balance ?? payment.arrearsAdded ?? 0;
                         const credit = payment.credit || 0;
                         return [payment.receipt || String(payment.amount || 0), balance > 0 ? `Bal: ${balance}` : '', credit > 0 ? `Credit: ${credit}` : ''].filter(Boolean).join('\n');
@@ -414,8 +414,8 @@ const { useState, useEffect, useMemo, useRef } = React;
                     startY: subtitle ? 58 : 48,
                     theme: 'grid',
                     styles: { fontSize: 6, cellPadding: 2, overflow: 'linebreak', valign: 'top', lineColor: [75, 85, 99], lineWidth: 0.35 },
-                    headStyles: { fillColor: [22, 101, 52], textColor: 255, fontStyle: 'bold', lineColor: [31, 41, 55], lineWidth: 0.5 },
-                    alternateRowStyles: { fillColor: [248, 250, 252] },
+                    headStyles: { fillColor: [0, 0, 0], textColor: 255, fontStyle: 'bold', lineColor: [0, 0, 0], lineWidth: 0.5 },
+                    alternateRowStyles: { fillColor: [255, 255, 255] },
                     columnStyles: { 0: { cellWidth: 24, halign: 'center' }, 1: { cellWidth: 34, halign: 'center' }, 2: { cellWidth: 90 }, 3: { cellWidth: 70 }, 4: { cellWidth: 55, halign: 'center' }, 5: { cellWidth: 42, halign: 'center' }, 6: { cellWidth: 42 }, 7: { cellWidth: 42 }, 8: { cellWidth: 38 } },
                     margin: { left: 18, right: 18 },
                     didParseCell: (data) => {
@@ -423,17 +423,9 @@ const { useState, useEffect, useMemo, useRef } = React;
                             data.cell.styles.halign = 'center';
                         }
                         if (data.section === 'body' && data.column.index >= firstMonthColumn) {
-                            const value = String(data.cell.raw || '');
-                            if (value === '-') {
-                                data.cell.styles.fillColor = [254, 226, 226];
-                                data.cell.styles.textColor = [153, 27, 27];
-                                data.cell.styles.halign = 'center';
-                                data.cell.styles.fontStyle = 'bold';
-                            } else {
-                                data.cell.styles.fillColor = [220, 252, 231];
-                                data.cell.styles.textColor = [20, 83, 45];
-                                data.cell.styles.fontStyle = 'bold';
-                            }
+                            data.cell.styles.textColor = [0, 0, 0];
+                            data.cell.styles.fillColor = [255, 255, 255];
+                            data.cell.styles.fontStyle = 'bold';
                         }
                     },
                     didDrawPage: () => {
