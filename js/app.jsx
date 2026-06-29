@@ -915,16 +915,16 @@ const { useState, useEffect, useMemo, useRef } = React;
             const calculateDefaultFee = () => members.length * globalBaseFee;
 
             return (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-2 sm:p-4">
-                    <div className="bg-gray-100 rounded-lg shadow-2xl max-w-5xl w-full flex flex-col h-[95vh] md:h-[90vh]">
-                        <div className="bg-yellow-600 px-6 py-4 flex justify-between items-center text-white shrink-0 shadow-sm z-10">
-                            <h3 className="text-lg font-bold flex items-center"><Icons.Link /> {groupOnly ? 'Group Setup & Concession' : 'Add / Edit Student Details'}</h3>
-                            <button onClick={onClose} className="hover:text-gray-200"><Icons.Close /></button>
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-[70] p-0 sm:p-4">
+                    <div className="bg-gray-100 shadow-2xl max-w-5xl w-full flex flex-col h-[100dvh] sm:h-[95vh] md:h-[90vh] rounded-none sm:rounded-lg overflow-hidden">
+                        <div className="bg-yellow-600 px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center text-white shrink-0 shadow-sm z-10">
+                            <h3 className="text-base sm:text-lg font-bold flex items-center min-w-0 pr-3"><Icons.Link /> <span className="truncate">{groupOnly ? 'Group Setup & Concession' : 'Add / Edit Student Details'}</span></h3>
+                            <button onClick={onClose} className="hover:text-gray-200 shrink-0"><Icons.Close /></button>
                         </div>
                         
-                        <div className="flex-1 overflow-y-auto p-4 flex flex-col lg:flex-row gap-4">
-                            {!groupOnly && <div className="flex-1 lg:w-3/5 space-y-4">
-                                <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-200">
+                        <div className="flex-1 overflow-y-auto p-3 sm:p-4 flex flex-col lg:flex-row gap-3 sm:gap-4">
+                            {!groupOnly && <div className="flex-1 lg:w-3/5 space-y-3 sm:space-y-4">
+                                <div className="bg-white p-4 sm:p-5 rounded-lg shadow-sm border border-gray-200">
                                     <h4 className="font-bold text-gray-800 mb-4 border-b pb-2">1. Student Profile Details</h4>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div className="sm:col-span-2"><label className="text-xs font-bold text-gray-500 mb-1 block">Full Name *</label><input type="text" className="w-full p-2.5 border rounded font-bold uppercase focus:ring-2 focus:ring-blue-400 outline-none" value={stName} onChange={e => setStName(e.target.value)} required /></div>
@@ -943,13 +943,13 @@ const { useState, useEffect, useMemo, useRef } = React;
                                 </div>
                             </div>}
 
-                            <div className={`flex-1 ${groupOnly ? 'lg:w-full max-w-3xl mx-auto' : 'lg:w-2/5'} flex flex-col space-y-4`}>
-                                <div className="bg-white p-5 rounded-lg shadow-sm border border-yellow-300">
+                            <div className={`flex-1 ${groupOnly ? 'lg:w-full max-w-3xl mx-auto w-full' : 'lg:w-2/5'} flex flex-col space-y-3 sm:space-y-4 min-h-0`}>
+                                <div className="bg-white p-4 sm:p-5 rounded-lg shadow-sm border border-yellow-300">
                                     <h4 className="font-bold text-yellow-800 mb-4 border-b border-yellow-200 pb-2">2. Shared Family Setup (Finance)</h4>
                                     <div className="space-y-4">
                                         <div><label className="block text-xs font-bold text-gray-500 mb-1">Guardian Name (Shared)</label><input type="text" className="w-full p-2.5 border border-gray-300 rounded uppercase focus:ring-2 focus:ring-yellow-400 outline-none font-bold" value={guardian} onChange={e => setGuardian(e.target.value)} /></div>
                                         <div><label className="block text-xs font-bold text-gray-500 mb-1">Mobile No. (Acts as Group ID)</label><input type="tel" className="w-full p-2.5 border border-gray-300 rounded font-bold focus:ring-2 focus:ring-yellow-400 outline-none" value={phone} onChange={e => setPhone(e.target.value)} /></div>
-                                        <div className="grid grid-cols-2 gap-3">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             <div>
                                                 <label className="block text-xs font-bold text-gray-500 mb-1">Pending Arrears (₹)</label>
                                                 <input type="number" min="0" className="w-full p-2.5 border border-red-300 rounded bg-red-50 text-red-700 font-bold outline-none" value={pendingArrears} onChange={e => setPendingArrears(e.target.value)} />
@@ -962,22 +962,22 @@ const { useState, useEffect, useMemo, useRef } = React;
                                     </div>
                                 </div>
 
-                                <div className="bg-white p-4 rounded-lg shadow-sm border border-blue-200 flex-1 flex flex-col">
-                                    <h4 className="font-bold text-blue-800 mb-3 border-b pb-2 flex justify-between items-center">
-                                        <span>3. Link Siblings (Manual)</span><span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">{members.length} Selected</span>
+                                <div className="bg-white p-3 sm:p-4 rounded-lg shadow-sm border border-blue-200 flex-1 flex flex-col min-h-[260px]">
+                                    <h4 className="font-bold text-blue-800 mb-3 border-b pb-2 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                                        <span>3. Link Siblings (Manual)</span><span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full self-start sm:self-auto">{members.length} Selected</span>
                                     </h4>
                                     
-                                    <div className="flex space-x-2 mb-3 bg-blue-50 p-2 rounded border border-blue-100">
-                                        <select className="p-2 border rounded text-xs w-2/5 outline-none" value={searchClass} onChange={e => setSearchClass(e.target.value)}><option value="">Class</option>{CLASSES.map(c => <option key={c} value={c}>{c}</option>)}</select>
-                                        <input type="text" placeholder="Search to add..." className="p-2 border rounded text-xs flex-1 outline-none" value={searchName} onChange={e => setSearchName(e.target.value)} />
+                                    <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-2 mb-3 bg-blue-50 p-2 rounded border border-blue-100">
+                                        <select className="p-2 border rounded text-xs w-full outline-none" value={searchClass} onChange={e => setSearchClass(e.target.value)}><option value="">Class</option>{CLASSES.map(c => <option key={c} value={c}>{c}</option>)}</select>
+                                        <input type="text" placeholder="Search to add..." className="p-2 border rounded text-xs w-full outline-none" value={searchName} onChange={e => setSearchName(e.target.value)} />
                                     </div>
                                     
                                     {searchName && searchClass && (
                                         <div className="mb-3 border border-green-200 rounded max-h-24 overflow-y-auto bg-green-50 shadow-inner">
                                             {searchResults.length === 0 ? <div className="p-2 text-xs text-gray-500 text-center">No unlinked matches found.</div> : 
                                                 searchResults.map(s => (
-                                                    <div key={s.id} className="flex justify-between items-center p-2 border-b hover:bg-green-100">
-                                                        <span className="text-xs font-bold truncate max-w-[150px]">{s.name}</span>
+                                                    <div key={s.id} className="flex justify-between items-center gap-2 p-2 border-b hover:bg-green-100">
+                                                        <span className="text-xs font-bold truncate min-w-0">{s.name}</span>
                                                         <button type="button" onClick={() => handleAddSiblingAttempt(s)} className="text-[10px] font-bold bg-green-600 text-white px-2 py-1 rounded shadow-sm hover:bg-green-700">ADD</button>
                                                     </div>
                                                 ))
@@ -985,11 +985,11 @@ const { useState, useEffect, useMemo, useRef } = React;
                                         </div>
                                     )}
                                     
-                                    <div className="space-y-2 overflow-y-auto flex-1 pr-1">
+                                    <div className="space-y-2 overflow-y-auto flex-1 pr-1 min-h-[140px]">
                                         {members.map(m => (
-                                            <div key={m.id} className={`flex justify-between items-center p-2 rounded border ${m.id === primaryStudent.id ? 'bg-yellow-50 border-yellow-400' : 'bg-gray-50 border-gray-200'}`}>
-                                                <div className="truncate"><span className="font-bold text-sm text-gray-800">{m.name}</span> <span className="text-[10px] text-gray-600 font-medium bg-gray-200 px-1.5 py-0.5 rounded ml-1">Cls {m.studentClass}</span></div>
-                                                {m.id !== primaryStudent.id && <button type="button" onClick={() => removeMember(m.id)} className="text-red-500 hover:text-red-700 p-1"><Icons.Close /></button>}
+                                            <div key={m.id} className={`flex justify-between items-center gap-2 p-2 rounded border ${m.id === primaryStudent.id ? 'bg-yellow-50 border-yellow-400' : 'bg-gray-50 border-gray-200'}`}>
+                                                <div className="min-w-0"><span className="font-bold text-sm text-gray-800 break-words">{m.name}</span> <span className="text-[10px] text-gray-600 font-medium bg-gray-200 px-1.5 py-0.5 rounded ml-1 whitespace-nowrap">Cls {m.studentClass}</span></div>
+                                                {m.id !== primaryStudent.id && <button type="button" onClick={() => removeMember(m.id)} className="text-red-500 hover:text-red-700 p-1 shrink-0"><Icons.Close /></button>}
                                             </div>
                                         ))}
                                     </div>
@@ -997,11 +997,11 @@ const { useState, useEffect, useMemo, useRef } = React;
                             </div>
                         </div>
 
-                        <div className="bg-white px-6 py-4 border-t flex justify-between items-center shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] rounded-b-lg">
-                            {!primaryStudent.isNew && !groupOnly ? <button type="button" onClick={() => setConfirmDeleteOpen(true)} className="text-red-600 font-bold text-sm hover:underline">Delete Record</button> : <span></span>}
-                            <div className="space-x-3">
-                                <button type="button" onClick={onClose} className="px-5 py-2.5 border border-gray-300 rounded-md hover:bg-gray-50 font-bold text-gray-700 transition-colors">Cancel</button>
-                                <button type="button" onClick={handleSave} className="px-8 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-yellow-950 rounded-md font-extrabold shadow-md transition-colors">{groupOnly ? 'Save Group Setup' : 'Save All Details'}</button>
+                        <div className="bg-white px-4 sm:px-6 py-3 sm:py-4 border-t flex flex-col sm:flex-row gap-3 sm:justify-between sm:items-center shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] sm:rounded-b-lg">
+                            {!primaryStudent.isNew && !groupOnly ? <button type="button" onClick={() => setConfirmDeleteOpen(true)} className="w-full sm:w-auto text-red-600 font-bold text-sm hover:underline order-2 sm:order-1 py-2">Delete Record</button> : <span className="hidden sm:block"></span>}
+                            <div className="grid grid-cols-2 gap-2 w-full sm:w-auto sm:flex sm:gap-3 order-1 sm:order-2">
+                                <button type="button" onClick={onClose} className="w-full sm:w-auto px-4 sm:px-5 py-2.5 border border-gray-300 rounded-md hover:bg-gray-50 font-bold text-gray-700 transition-colors">Cancel</button>
+                                <button type="button" onClick={handleSave} className="w-full sm:w-auto px-4 sm:px-8 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-yellow-950 rounded-md font-extrabold shadow-md transition-colors">{groupOnly ? 'Save Group Setup' : 'Save All Details'}</button>
                             </div>
                         </div>
                     </div>
