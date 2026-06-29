@@ -183,7 +183,8 @@ const { useState, useEffect, useMemo, useRef } = React;
             
             // Filters
             const [classFilter, setClassFilter] = useState('');
-            const [sortOption, setSortOption] = useState('CLASS_DESC');
+            const [classSort, setClassSort] = useState('CLASS_DESC');
+            const [secondarySort, setSecondarySort] = useState('NONE');
             const [genderSort, setGenderSort] = useState('MIXED');
             const [statusFilter, setStatusFilter] = useState('ALL');
 
@@ -241,33 +242,32 @@ const { useState, useEffect, useMemo, useRef } = React;
                 };
                 const admissionNo = (student) => parseInt(student.profile?.admNo) || 999999;
 
+                const secondaryCompare = (a, b) => {
+                    if (secondarySort === 'NAME_ASC') return (a.name || '').localeCompare(b.name || '');
+                    if (secondarySort === 'NAME_DESC') return (b.name || '').localeCompare(a.name || '');
+                    if (secondarySort === 'ADM_NO') return admissionNo(a) - admissionNo(b);
+                    return (a.name || '').localeCompare(b.name || '');
+                };
+
                 result.sort((a, b) => {
-                    if (sortOption === 'CLASS_DESC' || sortOption === 'CLASS_ASC') {
-                        const dir = sortOption === 'CLASS_DESC' ? 1 : -1;
-                        const groupDiff = (groupLeadIndex(a) - groupLeadIndex(b)) * dir;
-                        if (groupDiff) return groupDiff;
+                    const dir = classSort === 'CLASS_DESC' ? 1 : -1;
+                    const groupDiff = (groupLeadIndex(a) - groupLeadIndex(b)) * dir;
+                    if (groupDiff) return groupDiff;
 
-                        if (a.groupId === b.groupId) {
-                            const memberDiff = classIndex(a) - classIndex(b);
-                            if (memberDiff) return memberDiff;
-                        } else {
-                            const ownClassDiff = (classIndex(a) - classIndex(b)) * dir;
-                            if (ownClassDiff) return ownClassDiff;
-                        }
-
-                        const genderDiff = genderRank(a) - genderRank(b);
-                        if (genderDiff) return genderDiff;
-                        return (a.name || '').localeCompare(b.name || '');
+                    if (a.groupId === b.groupId) {
+                        const memberDiff = classIndex(a) - classIndex(b);
+                        if (memberDiff) return memberDiff;
+                    } else {
+                        const ownClassDiff = (classIndex(a) - classIndex(b)) * dir;
+                        if (ownClassDiff) return ownClassDiff;
                     }
 
-                    if ((genderSort === 'BOYS_FIRST' || genderSort === 'GIRLS_FIRST') && a.gender !== b.gender) return genderRank(a) - genderRank(b);
-                    if (sortOption === 'NAME_ASC') return (a.name || '').localeCompare(b.name || '');
-                    if (sortOption === 'NAME_DESC') return (b.name || '').localeCompare(a.name || '');
-                    if (sortOption === 'ADM_NO') return admissionNo(a) - admissionNo(b);
-                    return 0;
+                    const genderDiff = genderRank(a) - genderRank(b);
+                    if (genderDiff) return genderDiff;
+                    return secondaryCompare(a, b);
                 });
                 return result;
-            }, [students, search, classFilter, statusFilter, sortOption, genderSort, settings.globalBaseFee]);
+            }, [students, search, classFilter, statusFilter, classSort, secondarySort, genderSort, settings.globalBaseFee]);
 
             const visibleStudentRows = useMemo(() => {
                 const seenGroups = new Set();
@@ -411,8 +411,11 @@ const { useState, useEffect, useMemo, useRef } = React;
                                 <option value="">Filter: All Classes</option>
                                 {CLASSES.map(c => <option key={c} value={c}>Class {c}</option>)}
                             </select>
-                            <select className="px-2 py-1.5 border rounded text-sm bg-white" value={sortOption} onChange={e => setSortOption(e.target.value)}>
-                                <option value="CLASS_ASC">Sort: Class (1 to +2)</option><option value="CLASS_DESC">Sort: Class (+2 to 1)</option><option value="NAME_ASC">Sort: Name (A-Z)</option><option value="NAME_DESC">Sort: Name (Z-A)</option><option value="ADM_NO">Sort: Admission No.</option>
+                            <select className="px-2 py-1.5 border rounded text-sm bg-white" value={classSort} onChange={e => setClassSort(e.target.value)}>
+                                <option value="CLASS_DESC">Class Order: +2 to 1</option><option value="CLASS_ASC">Class Order: 1 to +2</option>
+                            </select>
+                            <select className="px-2 py-1.5 border rounded text-sm bg-white" value={secondarySort} onChange={e => setSecondarySort(e.target.value)}>
+                                <option value="NONE">Student Sort: Default</option><option value="ADM_NO">Admission No.</option><option value="NAME_ASC">Name A-Z</option><option value="NAME_DESC">Name Z-A</option>
                             </select>
                             <select className="px-2 py-1.5 border rounded text-sm bg-white" value={genderSort} onChange={e => setGenderSort(e.target.value)}>
                                 <option value="MIXED">Gender: Mixed</option><option value="BOYS_FIRST">Boys First</option><option value="GIRLS_FIRST">Girls First</option><option value="CLASS_BOYS_GIRLS">Class-wise Boys, Girls</option>
@@ -420,7 +423,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                             <select className="px-2 py-1.5 border rounded text-sm bg-white font-medium text-blue-700" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
                                 <option value="ALL">Status: All</option><option value="CONCESSION">Concessions Only</option><option value="GROUPED">Grouped Siblings</option><option value="ARREARS">Pending Arrears</option>
                             </select>
-                            <button onClick={() => { setSearch(''); setClassFilter(''); setSortOption('CLASS_DESC'); setGenderSort('MIXED'); setStatusFilter('ALL'); }} className="px-3 py-1.5 rounded bg-gray-700 text-white text-sm font-bold hover:bg-gray-800">Clear</button>
+                            <button onClick={() => { setSearch(''); setClassFilter(''); setClassSort('CLASS_DESC'); setSecondarySort('NONE'); setGenderSort('MIXED'); setStatusFilter('ALL'); }} className="px-3 py-1.5 rounded bg-gray-700 text-white text-sm font-bold hover:bg-gray-800">Clear</button>
 
                             <div className="border-l border-gray-300 mx-1 h-6 hidden xl:block"></div>
 
