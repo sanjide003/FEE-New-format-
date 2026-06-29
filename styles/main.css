@@ -8,4 +8,6 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-
 
 .app-header { position: sticky; top: 0; z-index: 60; }
 .student-controls { position: sticky; top: 80px; z-index: 50; }
-.student-table-head { position: sticky; top: 160px; z-index: 40; }
+.student-table-head th { position: sticky; top: 154px; z-index: 45; background: #f3f4f6; }
+
+@media (max-width: 1024px) { .student-table-head th { top: 230px; } }
