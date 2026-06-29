@@ -1284,6 +1284,22 @@ const { useState, useEffect, useMemo, useRef } = React;
             };
             const describeFee = (fee) => fee.mode === 'MULTI' ? 'Different amount for each class' : (fee.applyTo === 'ALL' ? 'All classes - same amount' : `Only Class ${fee.applyTo}`);
             const displayAmount = (fee) => fee.mode === 'MULTI' ? CLASSES.map(c => `${c}: ₹${fee.classAmounts?.[c] || 0}`).join(' | ') : `₹${fee.amount}`;
+            const handleLogoUpload = (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                if (!file.type.startsWith('image/')) {
+                    e.target.value = '';
+                    return showAlert('Please upload an image file only.', 'Invalid Logo');
+                }
+                if (file.size > 200 * 1024) {
+                    e.target.value = '';
+                    return showAlert('Logo image must be 200KB or less. Please choose a smaller image.', 'Logo Too Large');
+                }
+                const reader = new FileReader();
+                reader.onload = () => setLogo(reader.result);
+                reader.onerror = () => showAlert('Unable to read the selected image.', 'Logo Upload Error');
+                reader.readAsDataURL(file);
+            };
 
             const handleSave = async (e) => {
                 e.preventDefault(); setSaving(true);
@@ -1305,9 +1321,13 @@ const { useState, useEffect, useMemo, useRef } = React;
                                     <div><label className="block text-sm font-bold mb-1 text-gray-700">Institution Name</label><input className="w-full px-4 py-2 border rounded-md font-bold outline-none" value={institutionName} onChange={e => setInstitutionName(e.target.value)} /></div>
                                     <div><label className="block text-sm font-bold mb-1 text-gray-700">Place</label><input className="w-full px-4 py-2 border rounded-md font-bold outline-none" value={institutionPlace} onChange={e => setInstitutionPlace(e.target.value)} /></div>
                                     <div><label className="block text-sm font-bold mb-1 text-gray-700">Register Number</label><input className="w-full px-4 py-2 border rounded-md font-bold outline-none" value={registerNumber} onChange={e => setRegisterNumber(e.target.value)} /></div>
-                                    <div><label className="block text-sm font-bold mb-1 text-gray-700">Logo URL / Base64</label><input className="w-full px-4 py-2 border rounded-md outline-none" value={logo} onChange={e => setLogo(e.target.value)} /></div>
+                                    <div>
+                                        <label className="block text-sm font-bold mb-1 text-gray-700">Logo Image Upload</label>
+                                        <input type="file" accept="image/*" className="w-full px-4 py-2 border rounded-md outline-none bg-white" onChange={handleLogoUpload} />
+                                        <p className="mt-1 text-[11px] font-bold text-red-600">Maximum logo image size: 200KB.</p>
+                                    </div>
                                 </div>
-                                {logo && <img src={logo} className="w-20 h-20 rounded-full object-cover border" />}
+                                {logo && <div className="flex items-center gap-3"><img src={logo} className="w-20 h-20 rounded-full object-cover border" /><button type="button" onClick={() => setLogo('')} className="px-3 py-1.5 rounded border border-red-200 text-red-600 text-xs font-bold hover:bg-red-50">Remove Logo</button></div>}
                                 <div><label className="block text-sm font-bold mb-1 text-gray-700">Default Base Fee (₹)</label><input type="number" required min="0" className="w-full px-4 py-2 border rounded-md text-lg font-bold outline-none" value={baseFee} onChange={e => setBaseFee(e.target.value)} /></div>
                                 <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg"><label className="block text-sm font-bold mb-3 text-blue-900">Academic Year Months</label><div className="grid grid-cols-2 gap-4"><select className="w-full p-2 border rounded bg-white" value={startMonth} onChange={e => setStartMonth(e.target.value)}>{ALL_MONTHS_BASE.map(m => <option key={m}>{m}</option>)}</select><select className="w-full p-2 border rounded bg-white" value={endMonth} onChange={e => setEndMonth(e.target.value)}>{ALL_MONTHS_BASE.map(m => <option key={m}>{m}</option>)}</select></div></div>
                             </div>
