@@ -391,7 +391,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                 const includeExtraTotal = preparedRows.some(row => row.totalExFee > 0);
                 const includeExtraBalance = preparedRows.some(row => row.dueExFee > 0);
                 const includeArrears = preparedRows.some(row => row.arrears > 0);
-                const columns = ['No', 'Class', 'Student Name', 'Guardian', 'Phone', 'Group Fee'];
+                const columns = ['No', 'Class', 'Student Name', 'Guardian', 'Phone', 'Fee'];
                 if (includeExtraTotal) columns.push('Extra Total');
                 if (includeExtraBalance) columns.push('Extra Balance');
                 if (includeArrears) columns.push('Arrears');
@@ -416,9 +416,12 @@ const { useState, useEffect, useMemo, useRef } = React;
                     styles: { fontSize: 6, cellPadding: 2, overflow: 'linebreak', valign: 'top', lineColor: [75, 85, 99], lineWidth: 0.35 },
                     headStyles: { fillColor: [22, 101, 52], textColor: 255, fontStyle: 'bold', lineColor: [31, 41, 55], lineWidth: 0.5 },
                     alternateRowStyles: { fillColor: [248, 250, 252] },
-                    columnStyles: { 0: { cellWidth: 24 }, 1: { cellWidth: 34 }, 2: { cellWidth: 90 }, 3: { cellWidth: 70 }, 4: { cellWidth: 55 }, 5: { cellWidth: 42 }, 6: { cellWidth: 42 }, 7: { cellWidth: 42 }, 8: { cellWidth: 38 } },
+                    columnStyles: { 0: { cellWidth: 24, halign: 'center' }, 1: { cellWidth: 34, halign: 'center' }, 2: { cellWidth: 90 }, 3: { cellWidth: 70 }, 4: { cellWidth: 55, halign: 'center' }, 5: { cellWidth: 42, halign: 'center' }, 6: { cellWidth: 42 }, 7: { cellWidth: 42 }, 8: { cellWidth: 38 } },
                     margin: { left: 18, right: 18 },
                     didParseCell: (data) => {
+                        if (data.column.index === 0 || data.column.index === 1 || data.column.index === 4 || data.column.index === 5 || data.column.index >= firstMonthColumn) {
+                            data.cell.styles.halign = 'center';
+                        }
                         if (data.section === 'body' && data.column.index >= firstMonthColumn) {
                             const value = String(data.cell.raw || '');
                             if (value === '-') {
