@@ -365,16 +365,51 @@ const { useState, useEffect, useMemo, useRef } = React;
             };
             const clearMultiSelection = () => setSelectedMonthPayments([]);
             const downloadTablePdf = () => {
-                const table = document.getElementById('student-table-export');
-                if (!table || !window.html2pdf) return showAlert('PDF export library is still loading. Please try again.', 'PDF Download');
-                const fileName = `${settings.institutionName || 'madrasa'}-fee-table.pdf`.replace(/\s+/g, '-').toLowerCase();
-                window.html2pdf().set({
-                    margin: 0.15,
-                    filename: fileName,
-                    image: { type: 'jpeg', quality: 0.98 },
-                    html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
-                    jsPDF: { unit: 'in', format: 'a3', orientation: 'landscape' }
-                }).from(table).save();
+                if (!window.jspdf?.jsPDF) return showAlert('PDF preview library is still loading. Please try again.', 'PDF Preview');
+                const doc = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+                const title = `${settings.institutionName || 'Madrasa Fee Manager'} - Fee Table`;
+                const subtitle = `${settings.institutionPlace || ''} ${settings.registerNumber ? `• Reg: ${settings.registerNumber}` : ''}`.trim();
+                const columns = ['No', 'Class', 'Student Name', 'Guardian', 'Phone', 'Group Fee', 'Extra Total', 'Extra Balance', 'Arrears', ...dynamicMonths];
+                const rows = visibleStudentRows.map((student, idx) => {
+                    const groupMembers = student.displayMembers || getGroupMembers(student.groupId);
+                    const groupFee = student.groupFee || (groupMembers.length * settings.globalBaseFee);
+                    const classText = groupMembers.map(member => member.studentClass).join('\n');
+                    const nameText = groupMembers.map((member, memberIdx) => `${groupMembers.length > 1 ? `${memberIdx + 1}. ` : ''}${member.name || ''}${member.gender ? ` (${member.gender})` : ''}`).join('\n');
+                    const appExtraFees = settings.extraFees?.filter(f => feeAppliesToStudent(f, student.studentClass)) || [];
+                    const totalExFee = appExtraFees.reduce((sum, f) => sum + feeAmountForStudent(f, student.studentClass), 0);
+                    const paidExFee = Object.values(student.extraFeePayments || {}).reduce((sum, p) => sum + parseInt(p.amount || 0), 0);
+                    const dueExFee = Math.max(0, totalExFee - paidExFee);
+                    const monthValues = dynamicMonths.map(month => {
+                        const payment = student.payments?.[month];
+                        if (!payment) return 'Not Paid';
+                        const balance = payment.balance ?? payment.arrearsAdded ?? 0;
+                        const credit = payment.credit || 0;
+                        return [`Paid: ₹${payment.amount || 0}`, payment.receipt ? `Rec: ${payment.receipt}` : '', payment.date ? `Date: ${payment.date}` : '', balance > 0 ? `Bal: ₹${balance}` : '', credit > 0 ? `Credit: ₹${credit}` : ''].filter(Boolean).join('\n');
+                    });
+                    return [idx + 1, classText, nameText, student.guardian || '-', student.phone || '-', `₹${groupFee}`, `₹${totalExFee}`, `₹${dueExFee}`, student.pendingArrears > 0 ? `₹${student.pendingArrears}` : '0', ...monthValues];
+                });
+
+                doc.setFontSize(14);
+                doc.text(title, 40, 30);
+                if (subtitle) { doc.setFontSize(9); doc.text(subtitle, 40, 46); }
+                doc.autoTable({
+                    head: [columns],
+                    body: rows,
+                    startY: subtitle ? 58 : 48,
+                    styles: { fontSize: 6, cellPadding: 2, overflow: 'linebreak', valign: 'top' },
+                    headStyles: { fillColor: [22, 101, 52], textColor: 255, fontStyle: 'bold' },
+                    alternateRowStyles: { fillColor: [248, 250, 252] },
+                    columnStyles: { 0: { cellWidth: 24 }, 1: { cellWidth: 34 }, 2: { cellWidth: 90 }, 3: { cellWidth: 70 }, 4: { cellWidth: 55 }, 5: { cellWidth: 42 }, 6: { cellWidth: 42 }, 7: { cellWidth: 42 }, 8: { cellWidth: 38 } },
+                    margin: { left: 18, right: 18 },
+                    didDrawPage: () => {
+                        const pageSize = doc.internal.pageSize;
+                        doc.setFontSize(7);
+                        doc.text(`Page ${doc.internal.getNumberOfPages()}`, pageSize.getWidth() - 55, pageSize.getHeight() - 12);
+                    }
+                });
+                const pdfUrl = URL.createObjectURL(doc.output('blob'));
+                const preview = window.open(pdfUrl, '_blank');
+                if (!preview) showAlert('Popup blocked. Please allow popups to preview and download the PDF.', 'PDF Preview');
             };
             const openFullStudentEditor = (student) => {
                 setProfileModalOpen(false);
@@ -450,7 +485,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                 </button>
                             </div>
 
-                            <button onClick={downloadTablePdf} className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded font-medium text-sm transition-colors shadow-sm">Download PDF</button>
+                            <button onClick={downloadTablePdf} className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded font-medium text-sm transition-colors shadow-sm">Preview PDF</button>
                             <button onClick={handleAddSingle} className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded font-medium text-sm transition-colors shadow-sm">+ Add Student</button>
                         </div>
                     </div>
