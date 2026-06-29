@@ -1,0 +1,1183 @@
+const { useState, useEffect, useMemo, useRef } = React;
+
+        // Firebase services are initialized in js/firebase-config.js
+
+        // Constants 
+        const ALL_MONTHS_BASE = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const CLASSES = ['+2', '+1', '10', '9', '8', '7', '6', '5', '4', '3', '2', '1'];
+
+        // Icons Component
+        const Icons = {
+            Menu: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>,
+            Dashboard: () => <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 13h8V3H3v10zm10 8h8V3h-8v18zM3 21h8v-6H3v6z"></path></svg>,
+            Search: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>,
+            Trash: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>,
+            Check: () => <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>,
+            Warning: () => <svg className="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>,
+            Male: () => <span className="text-blue-600 font-bold ml-1 text-xs px-1.5 py-0.5 bg-blue-50 border border-blue-200 rounded">(M)</span>,
+            Female: () => <span className="text-pink-600 font-bold ml-1 text-xs px-1.5 py-0.5 bg-pink-50 border border-pink-200 rounded">(F)</span>,
+            Close: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>,
+            Settings: () => <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>,
+            Users: () => <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>,
+            Link: () => <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>,
+            Upload: () => <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>,
+            UserCircle: () => <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>,
+            PlusCircle: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        };
+
+        // --- CUSTOM UI MODALS ---
+        const CustomConfirm = ({ isOpen, title = "Confirm", message, onConfirm, onCancel, confirmText = "Confirm", type = "danger" }) => {
+            if (!isOpen) return null;
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 transform transition-all">
+                        <h3 className={`text-lg font-bold mb-2 ${type === 'danger' ? 'text-red-600' : 'text-blue-600'}`}>{title}</h3>
+                        <p className="text-gray-700 mb-6 text-sm leading-relaxed">{message}</p>
+                        <div className="flex justify-end space-x-3">
+                            <button onClick={onCancel} className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 text-sm font-bold text-gray-700">Cancel</button>
+                            <button onClick={onConfirm} className={`px-4 py-2 rounded-md text-white text-sm font-bold shadow-md ${type === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
+                                {confirmText}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const CustomAlert = ({ isOpen, title = "Notice", message, onClose }) => {
+            if (!isOpen) return null;
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6">
+                        <h3 className="text-lg font-bold mb-2 text-gray-800">{title}</h3>
+                        <p className="text-gray-600 mb-6 text-sm">{message}</p>
+                        <div className="flex justify-end">
+                            <button onClick={onClose} className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-bold shadow-md">OK</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Main App Component
+        const App = () => {
+            const [activeTab, setActiveTab] = useState('DASHBOARD');
+            const [menuOpen, setMenuOpen] = useState(false);
+            const [students, setStudents] = useState([]);
+            const [settings, setSettings] = useState({ 
+                globalBaseFee: 500, 
+                academicStartMonth: 'Jun', 
+                academicEndMonth: 'May',
+                institutionName: 'Madrasa Fee Manager',
+                institutionPlace: '',
+                registerNumber: '',
+                logo: '',
+                extraFees: [] 
+            });
+            const [loading, setLoading] = useState(true);
+            const [error, setError] = useState(null);
+
+            // Global Alert State
+            const [alertState, setAlertState] = useState({ isOpen: false, title: '', message: '' });
+            const showAlert = (message, title = "Notice") => setAlertState({ isOpen: true, message, title });
+
+            useEffect(() => {
+                const unsubSettings = db.collection('settings').doc('global').onSnapshot(doc => {
+                    if (doc.exists) {
+                        setSettings({
+                            globalBaseFee: doc.data().globalBaseFee || 500,
+                            academicStartMonth: doc.data().academicStartMonth || 'Jun',
+                            academicEndMonth: doc.data().academicEndMonth || 'May',
+                            institutionName: doc.data().institutionName || 'Madrasa Fee Manager',
+                            institutionPlace: doc.data().institutionPlace || '',
+                            registerNumber: doc.data().registerNumber || '',
+                            logo: doc.data().logo || '',
+                            extraFees: doc.data().extraFees || []
+                        });
+                    } else {
+                        db.collection('settings').doc('global').set({ globalBaseFee: 500, academicStartMonth: 'Jun', academicEndMonth: 'May', institutionName: 'Madrasa Fee Manager', institutionPlace: '', registerNumber: '', logo: '', extraFees: [] });
+                    }
+                }, err => setError("Database Rules Error."));
+
+                const unsubStudents = db.collection('students').onSnapshot(snapshot => {
+                    const data = [];
+                    snapshot.forEach(doc => data.push({ id: doc.id, ...doc.data() }));
+                    setStudents(data);
+                    setLoading(false);
+                }, err => setError("Database Rules Error."));
+
+                return () => { unsubSettings(); unsubStudents(); };
+            }, []);
+
+            // Generate Dynamic Academic Months based on Settings
+            const dynamicMonths = useMemo(() => {
+                let res = [];
+                let s = ALL_MONTHS_BASE.indexOf(settings.academicStartMonth);
+                let e = ALL_MONTHS_BASE.indexOf(settings.academicEndMonth);
+                if (s <= e) res = ALL_MONTHS_BASE.slice(s, e + 1);
+                else res = [...ALL_MONTHS_BASE.slice(s), ...ALL_MONTHS_BASE.slice(0, e + 1)];
+                return res;
+            }, [settings.academicStartMonth, settings.academicEndMonth]);
+
+            if (error) return <div className="min-h-screen flex items-center justify-center text-red-600 font-bold">{error}</div>;
+            if (loading) return <div className="min-h-screen flex items-center justify-center animate-pulse text-gray-500 font-bold">Loading Data...</div>;
+
+            return (
+                <div className="min-h-screen flex flex-col bg-gray-50">
+                    <header className="bg-green-700 text-white shadow-md relative">
+                        <div className="max-w-full px-4 sm:px-6 lg:px-8 py-4 grid grid-cols-[auto_1fr_auto] items-center gap-3">
+                            <button onClick={() => setMenuOpen(!menuOpen)} className="p-2 rounded-lg bg-green-800 hover:bg-green-900"><Icons.Menu /></button>
+                            <div className="text-center min-w-0">
+                                <h1 className="text-2xl font-bold truncate">{settings.institutionName || 'Madrasa Fee Manager'}</h1>
+                                <p className="text-xs text-green-100 truncate">{settings.institutionPlace || 'Fee Management System'} {settings.registerNumber ? `• Reg: ${settings.registerNumber}` : ''}</p>
+                            </div>
+                            {settings.logo ? <img src={settings.logo} className="w-12 h-12 rounded-full bg-white object-cover border-2 border-white justify-self-end" /> : <div className="w-12 h-12 rounded-full bg-green-900 flex items-center justify-center font-black justify-self-end">MF</div>}
+                        </div>
+                        {menuOpen && <div className="absolute left-4 top-20 z-50 w-72 rounded-xl bg-white text-gray-800 shadow-2xl border overflow-hidden">
+                            {[['DASHBOARD','Dashboard',<Icons.Dashboard />],['STUDENTS','Student Management',<Icons.Users />],['CLASSES','Class Management',<Icons.Users />],['SETTINGS','Settings',<Icons.Settings />]].map(([key,label,icon]) => <button key={key} onClick={() => { setActiveTab(key); setMenuOpen(false); }} className={`w-full flex items-center px-5 py-4 font-bold hover:bg-green-50 ${activeTab === key ? 'bg-green-100 text-green-800' : ''}`}>{icon}{label}</button>)}
+                        </div>}
+                    </header>
+                    <main className="flex-1 max-w-full w-full mx-auto p-4 sm:p-6 lg:p-8 bg-white shadow-inner">
+                        {activeTab === 'DASHBOARD' && <DashboardTab students={students} settings={settings} dynamicMonths={dynamicMonths} />}
+                        {activeTab === 'STUDENTS' && <StudentTab students={students} settings={settings} dynamicMonths={dynamicMonths} showAlert={showAlert} />}
+                        {activeTab === 'CLASSES' && <ClassManagementTab students={students} showAlert={showAlert} />}
+                        {activeTab === 'SETTINGS' && <SettingsTab settings={settings} ALL_MONTHS_BASE={ALL_MONTHS_BASE} showAlert={showAlert} />}
+                    </main>
+
+                    <CustomAlert isOpen={alertState.isOpen} title={alertState.title} message={alertState.message} onClose={() => setAlertState({ isOpen: false, title: '', message: '' })} />
+                </div>
+            );
+        };
+
+        const feeAmountForStudent = (fee, studentClass) => {
+            if (!fee) return 0;
+            if (fee.mode === 'MULTI') return parseInt(fee.classAmounts?.[studentClass] || 0);
+            return parseInt(fee.amount || 0);
+        };
+        const feeAppliesToStudent = (fee, studentClass) => fee?.mode === 'ALL' || fee?.applyTo === 'ALL' || fee?.applyTo === studentClass || (fee?.mode === 'MULTI' && parseInt(fee.classAmounts?.[studentClass] || 0) > 0);
+
+        const DashboardTab = ({ students, settings, dynamicMonths }) => {
+            const totalStudents = students.length;
+            const groups = new Set(students.map(s => s.groupId)).size;
+            const monthlyCollected = students.reduce((sum, s) => sum + Object.values(s.payments || {}).reduce((a, p) => a + parseInt(p.amount || 0), 0), 0);
+            const extraCollected = students.reduce((sum, s) => sum + Object.values(s.extraFeePayments || {}).reduce((a, p) => a + parseInt(p.amount || 0), 0), 0);
+            const arrears = students.reduce((sum, s) => sum + parseInt(s.pendingArrears || 0), 0);
+            const paidCells = students.reduce((sum, s) => sum + dynamicMonths.filter(m => s.payments?.[m]).length, 0);
+            const totalCells = totalStudents * dynamicMonths.length;
+            const classRows = CLASSES.map(cls => ({ cls, count: students.filter(s => s.studentClass === cls).length, boys: students.filter(s => s.studentClass === cls && s.gender === 'M').length, girls: students.filter(s => s.studentClass === cls && s.gender === 'F').length })).filter(r => r.count);
+            return <div className="space-y-6">
+                <div className="bg-gradient-to-r from-green-700 to-emerald-600 text-white rounded-2xl p-6 shadow-lg"><h2 className="text-2xl font-black">Dashboard</h2><p className="text-green-100">Students, family fee groups, collections and pending dues at a glance.</p></div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+                    {[[totalStudents,'Total Students','bg-blue-600'],[groups,'Fee Groups','bg-yellow-600'],[`₹${monthlyCollected}`,'Monthly Collected','bg-green-600'],[`₹${extraCollected}`,'Extra Fee Collected','bg-purple-600'],[`₹${arrears}`,'Pending Arrears','bg-red-600']].map(([v,l,c]) => <div className={`${c} text-white rounded-xl p-5 shadow`}><div className="text-3xl font-black">{v}</div><div className="text-sm opacity-90 font-bold">{l}</div></div>)}
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-2 bg-white rounded-xl border shadow p-5"><h3 className="font-black text-gray-800 mb-4">Class Strength</h3><div className="space-y-3">{classRows.map(r => <div key={r.cls}><div className="flex justify-between text-sm font-bold"><span>Class {r.cls}</span><span>{r.count} ({r.boys} M / {r.girls} F)</span></div><div className="h-2 bg-gray-100 rounded"><div className="h-2 bg-green-500 rounded" style={{width: `${Math.max(5,(r.count/Math.max(1,totalStudents))*100)}%`}}></div></div></div>)}</div></div>
+                    <div className="bg-white rounded-xl border shadow p-5"><h3 className="font-black text-gray-800 mb-4">Fee Completion</h3><div className="text-5xl font-black text-green-700">{totalCells ? Math.round((paidCells/totalCells)*100) : 0}%</div><p className="text-sm text-gray-500 mt-2">{paidCells} of {totalCells} monthly fee entries recorded.</p><div className="mt-4 h-3 bg-gray-100 rounded"><div className="h-3 bg-green-600 rounded" style={{width: `${totalCells ? (paidCells/totalCells)*100 : 0}%`}}></div></div></div>
+                </div>
+            </div>;
+        };
+
+        // --- STUDENTS TAB COMPONENT ---
+        const StudentTab = ({ students, settings, dynamicMonths, showAlert }) => {
+            const [search, setSearch] = useState('');
+            
+            // Filters
+            const [classFilter, setClassFilter] = useState('');
+            const [sortOption, setSortOption] = useState('CLASS_DESC');
+            const [genderSort, setGenderSort] = useState('MIXED');
+            const [statusFilter, setStatusFilter] = useState('ALL');
+
+            const [perPage, setPerPage] = useState(30);
+            const [currentPage, setCurrentPage] = useState(1);
+            
+            const [familyModalOpen, setFamilyModalOpen] = useState(false);
+            const [selectedFamilyStudent, setSelectedFamilyStudent] = useState(null);
+            
+            const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+            const [paymentGroupData, setPaymentGroupData] = useState(null);
+
+            const [extraFeeModalOpen, setExtraFeeModalOpen] = useState(false);
+            const [extraFeeStudentData, setExtraFeeStudentData] = useState(null);
+
+            const [profileModalOpen, setProfileModalOpen] = useState(false);
+            const [selectedProfile, setSelectedProfile] = useState(null);
+            const [groupOnlyMode, setGroupOnlyMode] = useState(false);
+            const [multiPaymentModalOpen, setMultiPaymentModalOpen] = useState(false);
+            const [selectedMonthPayments, setSelectedMonthPayments] = useState([]);
+
+            const fileInputRef = useRef(null);
+            const [uploading, setUploading] = useState(false);
+            const [selectedUploadClass, setSelectedUploadClass] = useState('');
+
+            const getGroupMembers = (groupId) => students.filter(s => s.groupId === groupId);
+
+            const filteredStudents = useMemo(() => {
+                let result = [...students];
+                if (search) {
+                    const q = search.toLowerCase();
+                    result = result.filter(s => 
+                        s.name?.toLowerCase().includes(q) || s.phone?.includes(q) || s.guardian?.toLowerCase().includes(q) ||
+                        (s.payments && Object.values(s.payments).some(p => p.receipt?.toLowerCase().includes(q)))
+                    );
+                }
+                if (classFilter) result = result.filter(s => s.studentClass === classFilter);
+                if (statusFilter === 'ARREARS') result = result.filter(s => (s.pendingArrears || 0) > 0);
+                else if (statusFilter === 'GROUPED') result = result.filter(s => getGroupMembers(s.groupId).length > 1);
+                else if (statusFilter === 'CONCESSION') {
+                    result = result.filter(s => {
+                        const members = getGroupMembers(s.groupId);
+                        return s.groupFee !== null && s.groupFee !== (members.length * settings.globalBaseFee);
+                    });
+                }
+
+                result.sort((a, b) => {
+                    if (genderSort === 'BOYS_FIRST' && a.gender !== b.gender) return a.gender === 'M' ? -1 : 1;
+                    if (genderSort === 'GIRLS_FIRST' && a.gender !== b.gender) return a.gender === 'F' ? -1 : 1;
+                    if (sortOption === 'CLASS_DESC') {
+                        const idxA = CLASSES.indexOf(a.studentClass); const idxB = CLASSES.indexOf(b.studentClass);
+                        if (idxA !== idxB) return idxA - idxB;
+                        return (a.name || '').localeCompare(b.name || '');
+                    }
+                    if (sortOption === 'NAME_ASC') return (a.name || '').localeCompare(b.name || '');
+                    if (sortOption === 'NAME_DESC') return (b.name || '').localeCompare(a.name || '');
+                    if (sortOption === 'ADM_NO') return (parseInt(a.profile?.admNo) || 999999) - (parseInt(b.profile?.admNo) || 999999);
+                    return 0;
+                });
+                return result;
+            }, [students, search, classFilter, statusFilter, sortOption, genderSort, settings.globalBaseFee]);
+
+            const totalPages = Math.ceil(filteredStudents.length / perPage);
+            const paginatedStudents = filteredStudents.slice((currentPage - 1) * perPage, currentPage * perPage);
+
+            const triggerFileUpload = () => {
+                if (!selectedUploadClass) return showAlert("Please select a Target Class before uploading CSV.", "Upload Error");
+                fileInputRef.current.click();
+            };
+
+            const handleFileUpload = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                setUploading(true);
+                Papa.parse(file, {
+                    header: true, skipEmptyLines: true,
+                    complete: async (results) => {
+                        try {
+                            const batch = db.batch();
+                            results.data.forEach(row => {
+                                const rawName = row['Name'] || row['Student Name'] || row['Full Name'] || '';
+                                if (!rawName) return; 
+                                const studentData = {
+                                    name: rawName.trim().toUpperCase(),
+                                    studentClass: selectedUploadClass,
+                                    gender: (row['Gender'] || '').trim().toUpperCase().startsWith('F') ? 'F' : 'M',
+                                    guardian: (row['Father'] || row['Guardian'] || '').trim().toUpperCase(),
+                                    phone: (row['Mobile'] || row['Phone'] || '').trim(),
+                                    pendingArrears: 0, groupFee: null, payments: {}, extraFeePayments: {},
+                                    groupId: db.collection('students').doc().id, 
+                                    profile: {
+                                        dob: row['DOB'] || '', address: row['Permanent Address'] || '',
+                                        adhaar: row['Adhaar'] || '', admNo: row['Adm. No'] || '',
+                                        samasthaId: row['ID'] || '', admDate: row['Adm. Date'] || ''
+                                    }
+                                };
+                                batch.set(db.collection('students').doc(studentData.groupId), studentData);
+                            });
+                            await batch.commit();
+                            showAlert(`Students imported successfully to Class ${selectedUploadClass}`, "Success");
+                        } catch (err) {
+                            showAlert("Error uploading data. Check CSV format.", "Upload Error");
+                        }
+                        setUploading(false); setSelectedUploadClass(''); e.target.value = null;
+                    }
+                });
+            };
+
+            const handleAddSingle = () => {
+                const tempId = 'NEW_' + Date.now();
+                setSelectedFamilyStudent({ id: tempId, name: '', studentClass: '+2', gender: 'M', guardian: '', phone: '', groupId: tempId, pendingArrears: 0, groupFee: null, payments: {}, extraFeePayments: {}, profile: {}, isNew: true });
+                setGroupOnlyMode(false);
+                setFamilyModalOpen(true);
+            };
+
+            const openPaymentModal = (groupMembers, month) => {
+                const groupFee = groupMembers[0]?.groupFee || (groupMembers.length * settings.globalBaseFee);
+                const existingPayment = groupMembers[0]?.payments?.[month]; 
+                setPaymentGroupData({ members: groupMembers, month, groupFee, existingPayment });
+                setPaymentModalOpen(true);
+            };
+
+            const openExtraFeeModal = (student) => {
+                setExtraFeeStudentData(student);
+                setExtraFeeModalOpen(true);
+            };
+
+            const paymentKey = (groupId, month) => `${groupId}_${month}`;
+            const isMonthSelected = (groupId, month) => selectedMonthPayments.some(item => item.key === paymentKey(groupId, month));
+            const toggleMonthSelection = (e, groupMembers, month, groupFee) => {
+                e.stopPropagation();
+                const key = paymentKey(groupMembers[0]?.groupId, month);
+                setSelectedMonthPayments(prev => prev.some(item => item.key === key) ? prev.filter(item => item.key !== key) : [...prev, { key, groupId: groupMembers[0]?.groupId, members: groupMembers, month, groupFee }]);
+            };
+            const openMultiEntry = () => {
+                if (!selectedMonthPayments.length) return;
+                setMultiPaymentModalOpen(true);
+            };
+            const clearMultiSelection = () => setSelectedMonthPayments([]);
+            const openFullStudentEditor = (student) => {
+                setProfileModalOpen(false);
+                setSelectedFamilyStudent(student);
+                setGroupOnlyMode(false);
+                setFamilyModalOpen(true);
+            };
+            const renderMonthCells = (student, groupMembers) => {
+                const cells = [];
+                let i = 0;
+                while (i < dynamicMonths.length) {
+                    const month = dynamicMonths[i];
+                    const payment = student.payments?.[month];
+                    if (payment?.batchId) {
+                        const batchMonths = [];
+                        let j = i;
+                        while (j < dynamicMonths.length && student.payments?.[dynamicMonths[j]]?.batchId === payment.batchId) { batchMonths.push(dynamicMonths[j]); j++; }
+                        if (batchMonths.length > 1) {
+                            const totalPaid = batchMonths.reduce((sum, m) => sum + parseInt(student.payments?.[m]?.amount || 0), 0);
+                            const totalBal = batchMonths.reduce((sum, m) => sum + parseInt(student.payments?.[m]?.arrearsAdded || 0), 0);
+                            cells.push(<td key={payment.batchId} colSpan={batchMonths.length} className="px-1.5 py-1 border-r cursor-pointer bg-green-50 hover:bg-green-100 min-w-[140px]" onClick={() => openPaymentModal(groupMembers, month)}><div className="rounded-lg border border-green-300 bg-green-100 p-2 text-[10px] leading-tight whitespace-normal shadow-sm text-green-900"><div className="font-black text-center text-[11px] mb-1">✓ {batchMonths.join(', ')}</div><div className="font-bold">Date: {payment.date || '-'}</div><div className="font-bold">Rec: {payment.receipt || 'N/A'}</div><div>Paid Total: ₹{totalPaid}</div>{totalBal > 0 && <div className="text-red-700 font-black">Balance: ₹{totalBal}</div>}</div></td>);
+                            i = j;
+                            continue;
+                        }
+                    }
+                    const groupFee = groupMembers[0]?.groupFee || (groupMembers.length * settings.globalBaseFee);
+                    const balance = payment?.arrearsAdded || 0;
+                    cells.push(<td key={month} className={`px-1.5 py-1 border-r cursor-pointer transition-colors min-w-[110px] ${payment ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-red-50'}`} onClick={() => openPaymentModal(groupMembers, month)}><div className="relative"><input type="checkbox" checked={isMonthSelected(groupMembers[0]?.groupId, month)} onChange={(e) => toggleMonthSelection(e, groupMembers, month, groupFee)} onClick={(e) => e.stopPropagation()} className="absolute -top-0.5 -left-0.5 w-3 h-3 accent-green-700" />{!payment ? <div className="min-h-[52px] flex flex-col items-center justify-center text-red-600 pt-2"><span className="w-6 h-6 rounded-full bg-red-100 border border-red-300 flex items-center justify-center text-[10px] font-black">!</span><span className="text-[10px] font-bold mt-1">Not Paid</span></div> : <div className={`rounded-lg border p-1.5 text-[10px] leading-tight whitespace-normal shadow-sm ${payment.status === 'FULL' ? 'bg-green-100 border-green-300 text-green-900' : 'bg-yellow-50 border-yellow-300 text-yellow-900'}`}><div className="flex items-center justify-center gap-1 font-black text-[11px] mb-1">{payment.status === 'FULL' ? <span className="text-green-700">✓ Paid</span> : <span className="text-yellow-800">Partial</span>}</div><div className="font-bold">Date: {payment.date || '-'}</div><div className="font-bold">Rec: {payment.receipt || 'N/A'}</div><div>Paid: ₹{payment.amount || 0}</div>{balance > 0 && <div className="text-red-700 font-black">Bal: ₹{balance}</div>}</div>}</div></td>);
+                    i++;
+                }
+                return cells;
+            };
+
+            return (
+                <div className="flex flex-col space-y-4">
+                    {/* Top Controls */}
+                    <div className="flex flex-col lg:flex-row justify-between items-center gap-3 bg-gray-50 p-4 rounded-lg border">
+                        <div className="flex items-center space-x-2 w-full lg:w-1/4 relative">
+                            <Icons.Search />
+                            <input type="text" placeholder="Search..." className="w-full px-3 py-1.5 border rounded focus:ring-green-500 outline-none text-sm" value={search} onChange={e => { setSearch(e.target.value); setCurrentPage(1); }} />
+                        </div>
+                        
+                        <div className="flex flex-wrap items-center gap-2">
+                            <select className="px-2 py-1.5 border rounded text-sm bg-white" value={classFilter} onChange={e => { setClassFilter(e.target.value); setCurrentPage(1); }}>
+                                <option value="">Filter: All Classes</option>
+                                {CLASSES.map(c => <option key={c} value={c}>Class {c}</option>)}
+                            </select>
+                            <select className="px-2 py-1.5 border rounded text-sm bg-white" value={sortOption} onChange={e => { setSortOption(e.target.value); setCurrentPage(1); }}>
+                                <option value="CLASS_DESC">Sort: Class (+2 to 1)</option><option value="NAME_ASC">Sort: Name (A-Z)</option><option value="NAME_DESC">Sort: Name (Z-A)</option><option value="ADM_NO">Sort: Admission No.</option>
+                            </select>
+                            <select className="px-2 py-1.5 border rounded text-sm bg-white" value={genderSort} onChange={e => { setGenderSort(e.target.value); setCurrentPage(1); }}>
+                                <option value="MIXED">Gender: Mixed</option><option value="BOYS_FIRST">Boys First</option><option value="GIRLS_FIRST">Girls First</option>
+                            </select>
+                            <select className="px-2 py-1.5 border rounded text-sm bg-white font-medium text-blue-700" value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setCurrentPage(1); }}>
+                                <option value="ALL">Status: All</option><option value="CONCESSION">Concessions Only</option><option value="GROUPED">Grouped Siblings</option><option value="ARREARS">Pending Arrears</option>
+                            </select>
+                            <button onClick={() => { setSearch(''); setClassFilter(''); setSortOption('CLASS_DESC'); setGenderSort('MIXED'); setStatusFilter('ALL'); setCurrentPage(1); }} className="px-3 py-1.5 rounded bg-gray-700 text-white text-sm font-bold hover:bg-gray-800">Clear</button>
+
+                            <div className="border-l border-gray-300 mx-1 h-6 hidden xl:block"></div>
+
+                            <div className="flex items-center bg-blue-50 border border-blue-200 rounded p-1">
+                                <select className="px-2 py-1 bg-transparent outline-none text-xs font-bold text-blue-800" value={selectedUploadClass} onChange={e => setSelectedUploadClass(e.target.value)}>
+                                    <option value="">-- Target Class --</option>
+                                    {CLASSES.map(c => <option key={c} value={c}>Class {c}</option>)}
+                                </select>
+                                <input type="file" accept=".csv" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
+                                <button onClick={triggerFileUpload} disabled={uploading} className="flex items-center bg-blue-700 hover:bg-blue-800 text-white px-2 py-1 rounded font-medium text-xs disabled:opacity-50 ml-1">
+                                    <Icons.Upload /> {uploading ? 'Wait...' : 'CSV Upload'}
+                                </button>
+                            </div>
+
+                            <button onClick={handleAddSingle} className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded font-medium text-sm transition-colors shadow-sm">+ Add Student</button>
+                        </div>
+                    </div>
+
+
+                    {selectedMonthPayments.length > 0 && (
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-green-50 border border-green-200 rounded-lg p-3 shadow-sm">
+                            <div className="text-sm text-green-900 font-bold">{selectedMonthPayments.length} fee item(s) selected • Total: ₹{selectedMonthPayments.reduce((sum, item) => sum + parseInt(item.groupFee || 0), 0)}</div>
+                            <div className="flex gap-2"><button onClick={clearMultiSelection} className="px-3 py-1.5 rounded border border-green-300 bg-white text-green-800 font-bold text-sm">Clear</button><button onClick={openMultiEntry} className="px-4 py-1.5 rounded bg-green-700 text-white font-bold text-sm shadow">Entry</button></div>
+                        </div>
+                    )}
+
+                    {/* Data Table */}
+                    <div className="table-container border rounded-lg shadow-sm bg-white">
+                        <table className="min-w-full text-sm text-left whitespace-nowrap">
+                            <thead className="text-xs text-gray-700 uppercase bg-gray-100 sticky top-0 z-10 shadow-sm border-b">
+                                <tr>
+                                    <th className="px-3 py-2 w-10">No</th>
+                                    <th className="px-3 py-2 w-14">Class</th>
+                                    <th className="px-3 py-2">Student Name</th>
+                                    <th className="px-3 py-2 border-r">Guardian & Contact</th>
+                                    <th className="px-3 py-2 text-center bg-yellow-50 text-yellow-800 border-r w-24">Group Setup</th>
+                                    <th className="px-3 py-2 text-center bg-purple-50 text-purple-800 border-r w-24">Extra Fees</th>
+                                    <th className="px-3 py-2 text-right text-red-600 w-20 border-r">Arrears</th>
+                                    {dynamicMonths.map(m => <th key={m} className="px-2 py-2 text-center border-r min-w-[110px]">{m}</th>)}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {paginatedStudents.length === 0 ? (
+                                    <tr><td colSpan={7 + dynamicMonths.length} className="text-center py-8 text-gray-500">No students match the current filters.</td></tr>
+                                ) : (
+                                    paginatedStudents.map((student, idx) => {
+                                        const groupMembers = getGroupMembers(student.groupId);
+                                        const isGroup = groupMembers.length > 1;
+                                        const actualFee = student.groupFee || (groupMembers.length * settings.globalBaseFee);
+                                        const hasConcession = student.groupFee !== null && student.groupFee !== (groupMembers.length * settings.globalBaseFee);
+                                        
+                                        // Calculate Extra Fees Due
+                                        const appExtraFees = settings.extraFees?.filter(f => feeAppliesToStudent(f, student.studentClass)) || [];
+                                        const totalExFee = appExtraFees.reduce((sum, f) => sum + feeAmountForStudent(f, student.studentClass), 0);
+                                        const paidExFee = Object.values(student.extraFeePayments || {}).reduce((sum, p) => sum + parseInt(p.amount || 0), 0);
+                                        const dueExFee = Math.max(0, totalExFee - paidExFee);
+
+                                        return (
+                                            <tr key={student.id} className="bg-white border-b hover:bg-green-50 transition-colors">
+                                                <td className="px-3 py-2 text-gray-500 text-xs">{(currentPage - 1) * perPage + idx + 1}</td>
+                                                <td className="px-3 py-2 font-bold">{student.studentClass}</td>
+                                                
+                                                <td className="px-3 py-2">
+                                                    <div className="flex items-center">
+                                                        <span className="font-bold text-blue-700 hover:text-blue-900 cursor-pointer hover:underline truncate max-w-[180px]" onClick={() => { setSelectedProfile(student); setProfileModalOpen(true); }}>
+                                                            {student.name}
+                                                        </span>
+                                                        {student.gender === 'M' ? <Icons.Male/> : <Icons.Female/>}
+                                                    </div>
+                                                </td>
+
+                                                <td className="px-3 py-2 border-r">
+                                                    <div className="flex flex-col leading-tight">
+                                                        <span className="font-semibold text-gray-800 text-xs truncate max-w-[160px]">{student.guardian || '-'}</span>
+                                                        <span className="text-[11px] text-gray-500 font-medium tracking-wide mt-0.5">{student.phone || '-'}</span>
+                                                    </div>
+                                                </td>
+                                                
+                                                <td className="px-2 py-2 border-r text-center bg-yellow-50/20">
+                                                    <button onClick={() => { setSelectedFamilyStudent(student); setGroupOnlyMode(true); setFamilyModalOpen(true); }} className={`w-full flex items-center justify-center px-1 py-1 bg-white border rounded font-bold shadow-sm transition-all text-[11px] tracking-wide ${hasConcession ? 'border-yellow-400 text-yellow-900 bg-yellow-50' : 'border-gray-200 text-gray-700 hover:border-yellow-300'}`}>
+                                                        {isGroup && <Icons.Link />} ₹{actualFee} {isGroup ? `(${groupMembers.length})` : ''}
+                                                    </button>
+                                                </td>
+
+                                                <td className="px-2 py-2 border-r text-center bg-purple-50/20">
+                                                    <button onClick={() => openExtraFeeModal(student)} className={`w-full flex flex-col items-center justify-center px-1 py-1 bg-white border rounded font-bold shadow-sm text-[11px] leading-tight ${dueExFee > 0 ? 'border-purple-300 text-purple-700' : 'border-gray-200 text-green-700'}`}>
+                                                        <span>Total: ₹{totalExFee}</span>
+                                                        <span className={dueExFee > 0 ? 'text-red-600' : 'text-green-600'}>{dueExFee > 0 ? `Balance: ₹${dueExFee}` : 'Balance: ₹0'}</span>
+                                                    </button>
+                                                </td>
+                                                
+                                                <td className={`px-3 py-2 text-right font-bold border-r ${student.pendingArrears > 0 ? 'text-red-600 bg-red-50/50' : 'text-gray-300'}`}>
+                                                    {student.pendingArrears > 0 ? `₹${student.pendingArrears}` : '0'}
+                                                </td>
+
+                                                {/* Dynamic month columns with visible payment details */}
+                                                {renderMonthCells(student, groupMembers)}
+                                            </tr>
+                                        );
+                                    })
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Pagination */}
+                    {totalPages > 1 && (
+                        <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border">
+                            <span className="text-xs font-medium text-gray-500">Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, filteredStudents.length)} of {filteredStudents.length}</span>
+                            <div className="flex space-x-2 text-sm">
+                                <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="px-3 py-1 border rounded bg-white disabled:opacity-50 hover:bg-gray-100 font-medium">Prev</button>
+                                <span className="px-3 py-1 font-bold text-gray-700">Page {currentPage} of {totalPages}</span>
+                                <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="px-3 py-1 border rounded bg-white disabled:opacity-50 hover:bg-gray-100 font-medium">Next</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {familyModalOpen && <FamilySetupModal primaryStudent={selectedFamilyStudent} allStudents={students} globalBaseFee={settings.globalBaseFee} groupOnly={groupOnlyMode} onClose={() => setFamilyModalOpen(false)} showAlert={showAlert}/>}
+                    {paymentModalOpen && <GroupPaymentModal context={paymentGroupData} onClose={() => setPaymentModalOpen(false)} showAlert={showAlert}/>}
+                    {multiPaymentModalOpen && <MultiPaymentModal selectedItems={selectedMonthPayments} onClose={() => setMultiPaymentModalOpen(false)} onSaved={() => { setMultiPaymentModalOpen(false); clearMultiSelection(); }} showAlert={showAlert}/>}
+                    {extraFeeModalOpen && <ExtraFeeModal student={extraFeeStudentData} settings={settings} onClose={() => setExtraFeeModalOpen(false)} showAlert={showAlert}/>}
+                    {profileModalOpen && <StudentProfileModal student={selectedProfile} onClose={() => setProfileModalOpen(false)} onEdit={() => openFullStudentEditor(selectedProfile)} showAlert={showAlert} />}
+                </div>
+            );
+        };
+
+        // --- STUDENT PROFILE MODAL ---
+        const StudentProfileModal = ({ student, onClose, onEdit, showAlert }) => {
+            if (!student) return null;
+            const prof = student.profile || {};
+            
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[80] p-4">
+                    <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden">
+                        <div className="bg-blue-600 px-6 py-4 flex justify-between items-center text-white">
+                            <h3 className="text-lg font-bold flex items-center"><Icons.UserCircle /> Student Profile</h3>
+                            <button onClick={onClose} className="hover:text-gray-200"><Icons.Close /></button>
+                        </div>
+                        <div className="p-6">
+                            <div className="flex items-center space-x-4 border-b pb-4 mb-4">
+                                <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-2xl font-bold uppercase">
+                                    {student.name.charAt(0)}
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold text-gray-800 uppercase">{student.name}</h2>
+                                    <p className="text-sm font-medium text-blue-600">Class: {student.studentClass} | {student.gender === 'M' ? 'Male' : 'Female'}</p>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-y-4 gap-x-6 text-sm">
+                                <div><span className="block text-gray-500 font-medium text-xs">Guardian / Father</span><span className="font-bold text-gray-800">{student.guardian || '-'}</span></div>
+                                <div><span className="block text-gray-500 font-medium text-xs">Mobile Number</span><span className="font-bold text-gray-800">{student.phone || '-'}</span></div>
+                                <div className="col-span-2"><span className="block text-gray-500 font-medium text-xs">Permanent Address</span><span className="font-bold text-gray-800">{prof.address || '-'}</span></div>
+                                <div><span className="block text-gray-500 font-medium text-xs">Date of Birth (DOB)</span><span className="font-bold text-gray-800">{prof.dob || '-'}</span></div>
+                                <div><span className="block text-gray-500 font-medium text-xs">Aadhaar Number</span><span className="font-bold text-gray-800">{prof.adhaar || '-'}</span></div>
+                                <div><span className="block text-gray-500 font-medium text-xs">Admission No.</span><span className="font-bold text-gray-800">{prof.admNo || '-'}</span></div>
+                                <div><span className="block text-gray-500 font-medium text-xs">Admission Date</span><span className="font-bold text-gray-800">{prof.admDate || '-'}</span></div>
+                                <div className="col-span-2"><span className="block text-gray-500 font-medium text-xs">Samastha ID</span><span className="font-bold text-gray-800">{prof.samasthaId || '-'}</span></div>
+                            </div>
+                        </div>
+                        <div className="bg-gray-50 px-6 py-4 border-t flex justify-between items-center">
+                            <button onClick={async () => { if (confirm('Delete this student record permanently?')) { await db.collection('students').doc(student.id).delete(); onClose(); showAlert('Student deleted successfully.', 'Deleted'); } }} className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-md font-bold">Delete</button>
+                            <div className="space-x-2"><button onClick={onClose} className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-md font-bold">Cancel</button><button onClick={onEdit} className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-bold shadow">Edit</button></div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- EXPANDED FAMILY / GROUP SETUP MODAL ---
+        const FamilySetupModal = ({ primaryStudent, allStudents, globalBaseFee, groupOnly = false, onClose, showAlert }) => {
+            const [members, setMembers] = useState([]);
+            const [searchClass, setSearchClass] = useState('');
+            const [searchName, setSearchName] = useState('');
+            
+            const [groupFee, setGroupFee] = useState('');
+            const [guardian, setGuardian] = useState('');
+            const [phone, setPhone] = useState('');
+            const [pendingArrears, setPendingArrears] = useState('');
+            
+            const [stName, setStName] = useState('');
+            const [stClass, setStClass] = useState('');
+            const [stGender, setStGender] = useState('');
+            const [stDob, setStDob] = useState('');
+            const [stAddress, setStAddress] = useState('');
+            const [stAdhaar, setStAdhaar] = useState('');
+            const [stAdmNo, setStAdmNo] = useState('');
+            const [stAdmDate, setStAdmDate] = useState('');
+            const [stSamasthaId, setStSamasthaId] = useState('');
+
+            // Confirmation States
+            const [conflictStudent, setConflictStudent] = useState(null);
+            const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+
+            useEffect(() => {
+                const grp = primaryStudent.isNew ? [primaryStudent] : allStudents.filter(s => s.groupId === primaryStudent.groupId);
+                setMembers(grp);
+                setGroupFee(grp[0]?.groupFee || ''); setGuardian(grp[0]?.guardian || '');
+                setPhone(grp[0]?.phone || ''); setPendingArrears(grp[0]?.pendingArrears || 0);
+                
+                const p = grp.find(s => s.id === primaryStudent.id);
+                if(p) {
+                    setStName(p.name || ''); setStClass(p.studentClass || ''); setStGender(p.gender || 'M');
+                    const prof = p.profile || {};
+                    setStDob(prof.dob || ''); setStAddress(prof.address || ''); setStAdhaar(prof.adhaar || '');
+                    setStAdmNo(prof.admNo || ''); setStAdmDate(prof.admDate || ''); setStSamasthaId(prof.samasthaId || '');
+                }
+            }, [primaryStudent, allStudents]);
+
+            const handleAddSiblingAttempt = (studentToAdd) => {
+                if (members.find(m => m.id === studentToAdd.id)) return;
+                if (studentToAdd.phone && studentToAdd.phone !== phone && phone !== '') {
+                    setConflictStudent(studentToAdd); // Open CustomConfirm
+                } else {
+                    proceedAddSibling(studentToAdd, true);
+                }
+            };
+
+            const proceedAddSibling = (studentToAdd, keepPrimary) => {
+                if (!keepPrimary) {
+                    setPhone(studentToAdd.phone || ''); setGuardian(studentToAdd.guardian || '');
+                } else if (!phone) {
+                    setPhone(studentToAdd.phone || ''); setGuardian(studentToAdd.guardian || '');
+                }
+                setPendingArrears(prev => parseInt(prev || 0) + parseInt(studentToAdd.pendingArrears || 0));
+                setMembers(prev => [...prev, studentToAdd]);
+                setSearchName('');
+                setConflictStudent(null);
+            };
+
+            const removeMember = (id) => {
+                if (members.length === 1) return;
+                const memberToRemove = members.find(m => m.id === id);
+                setPendingArrears(prev => Math.max(0, parseInt(prev || 0) - parseInt(memberToRemove.pendingArrears || 0)));
+                setMembers(members.filter(m => m.id !== id));
+            };
+
+            const handleSave = async (e) => {
+                e.preventDefault();
+                if (!groupOnly && !stName.trim()) return showAlert('Student name is required before saving.', 'Missing Info');
+                const batch = db.batch();
+                const finalFee = groupFee ? parseInt(groupFee) : null;
+                const finalArrears = parseInt(pendingArrears || 0);
+
+                const primaryRef = primaryStudent.isNew ? db.collection('students').doc() : db.collection('students').doc(primaryStudent.id);
+                const finalGroupId = primaryStudent.isNew ? primaryRef.id : (members[0]?.groupId || db.collection('students').doc().id);
+                const primaryPayload = {
+                    name: stName.toUpperCase(), studentClass: stClass, gender: stGender,
+                    profile: { dob: stDob, address: stAddress, adhaar: stAdhaar, admNo: stAdmNo, admDate: stAdmDate, samasthaId: stSamasthaId }, payments: primaryStudent.payments || {}, extraFeePayments: primaryStudent.extraFeePayments || {}
+                };
+                if (!groupOnly) {
+                    primaryStudent.isNew ? batch.set(primaryRef, { ...primaryPayload, groupId: primaryRef.id, guardian: guardian.toUpperCase(), phone: phone, groupFee: finalFee, pendingArrears: finalArrears }) : batch.update(primaryRef, primaryPayload);
+                }
+
+                members.filter(m => !m.isNew).forEach(m => {
+                    const docRef = db.collection('students').doc(m.id);
+                    batch.update(docRef, {
+                        groupId: finalGroupId, guardian: guardian.toUpperCase(), phone: phone,
+                        groupFee: finalFee, pendingArrears: finalArrears
+                    });
+                });
+
+                const originalMembers = allStudents.filter(s => s.groupId === primaryStudent.groupId);
+                originalMembers.forEach(om => {
+                    if (!members.find(m => m.id === om.id)) {
+                        batch.update(db.collection('students').doc(om.id), { groupId: om.id, groupFee: null }); 
+                    }
+                });
+
+                await batch.commit();
+                onClose();
+            };
+
+            const executeDelete = async () => {
+                await db.collection('students').doc(primaryStudent.id).delete();
+                onClose();
+            };
+
+            const searchResults = allStudents.filter(s => 
+                s.id !== primaryStudent.id && s.studentClass === searchClass && 
+                (s.name || '').toLowerCase().includes(searchName.toLowerCase()) &&
+                !members.find(m => m.id === s.id)
+            );
+
+            const calculateDefaultFee = () => members.length * globalBaseFee;
+
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-2 sm:p-4">
+                    <div className="bg-gray-100 rounded-lg shadow-2xl max-w-5xl w-full flex flex-col h-[95vh] md:h-[90vh]">
+                        <div className="bg-yellow-600 px-6 py-4 flex justify-between items-center text-white shrink-0 shadow-sm z-10">
+                            <h3 className="text-lg font-bold flex items-center"><Icons.Link /> {groupOnly ? 'Group Setup & Concession' : 'Add / Edit Student Details'}</h3>
+                            <button onClick={onClose} className="hover:text-gray-200"><Icons.Close /></button>
+                        </div>
+                        
+                        <div className="flex-1 overflow-y-auto p-4 flex flex-col lg:flex-row gap-4">
+                            {!groupOnly && <div className="flex-1 lg:w-3/5 space-y-4">
+                                <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-200">
+                                    <h4 className="font-bold text-gray-800 mb-4 border-b pb-2">1. Student Profile Details</h4>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div className="sm:col-span-2"><label className="text-xs font-bold text-gray-500 mb-1 block">Full Name *</label><input type="text" className="w-full p-2.5 border rounded font-bold uppercase focus:ring-2 focus:ring-blue-400 outline-none" value={stName} onChange={e => setStName(e.target.value)} required /></div>
+                                        <div><label className="text-xs font-bold text-gray-500 mb-1 block">Class *</label><select className="w-full p-2.5 border rounded bg-white focus:ring-2 focus:ring-blue-400 outline-none" value={stClass} onChange={e => setStClass(e.target.value)}>{CLASSES.map(c => <option key={c}>{c}</option>)}</select></div>
+                                        <div><label className="text-xs font-bold text-gray-500 mb-1 block">Gender *</label><select className="w-full p-2.5 border rounded bg-white focus:ring-2 focus:ring-blue-400 outline-none" value={stGender} onChange={e => setStGender(e.target.value)}><option value="M">Male</option><option value="F">Female</option></select></div>
+                                        
+                                        <div><label className="text-xs font-bold text-gray-500 mb-1 block">Admission No.</label><input type="text" className="w-full p-2 border rounded outline-none" value={stAdmNo} onChange={e => setStAdmNo(e.target.value)} /></div>
+                                        <div><label className="text-xs font-bold text-gray-500 mb-1 block">Date of Admission</label><input type="date" className="w-full p-2 border rounded outline-none text-sm" value={stAdmDate} onChange={e => setStAdmDate(e.target.value)} /></div>
+                                        
+                                        <div><label className="text-xs font-bold text-gray-500 mb-1 block">Date of Birth</label><input type="date" className="w-full p-2 border rounded outline-none text-sm" value={stDob} onChange={e => setStDob(e.target.value)} /></div>
+                                        <div><label className="text-xs font-bold text-gray-500 mb-1 block">Aadhaar No.</label><input type="text" className="w-full p-2 border rounded outline-none" value={stAdhaar} onChange={e => setStAdhaar(e.target.value)} /></div>
+                                        
+                                        <div className="sm:col-span-2"><label className="text-xs font-bold text-gray-500 mb-1 block">Permanent Address</label><textarea rows="2" className="w-full p-2 border rounded outline-none" value={stAddress} onChange={e => setStAddress(e.target.value)}></textarea></div>
+                                        <div className="sm:col-span-2"><label className="text-xs font-bold text-gray-500 mb-1 block">Samastha Online ID</label><input type="text" className="w-full p-2 border rounded outline-none" value={stSamasthaId} onChange={e => setStSamasthaId(e.target.value)} /></div>
+                                    </div>
+                                </div>
+                            </div>}
+
+                            <div className={`flex-1 ${groupOnly ? 'lg:w-full max-w-3xl mx-auto' : 'lg:w-2/5'} flex flex-col space-y-4`}>
+                                <div className="bg-white p-5 rounded-lg shadow-sm border border-yellow-300">
+                                    <h4 className="font-bold text-yellow-800 mb-4 border-b border-yellow-200 pb-2">2. Shared Family Setup (Finance)</h4>
+                                    <div className="space-y-4">
+                                        <div><label className="block text-xs font-bold text-gray-500 mb-1">Guardian Name (Shared)</label><input type="text" className="w-full p-2.5 border border-gray-300 rounded uppercase focus:ring-2 focus:ring-yellow-400 outline-none font-bold" value={guardian} onChange={e => setGuardian(e.target.value)} /></div>
+                                        <div><label className="block text-xs font-bold text-gray-500 mb-1">Mobile No. (Acts as Group ID)</label><input type="tel" className="w-full p-2.5 border border-gray-300 rounded font-bold focus:ring-2 focus:ring-yellow-400 outline-none" value={phone} onChange={e => setPhone(e.target.value)} /></div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-500 mb-1">Pending Arrears (₹)</label>
+                                                <input type="number" min="0" className="w-full p-2.5 border border-red-300 rounded bg-red-50 text-red-700 font-bold outline-none" value={pendingArrears} onChange={e => setPendingArrears(e.target.value)} />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-yellow-800 mb-1">Total Fee / Mnt</label>
+                                                <input type="number" min="0" placeholder={`₹${calculateDefaultFee()}`} className="w-full p-2.5 border border-yellow-400 rounded bg-yellow-50 text-yellow-900 font-bold outline-none placeholder-yellow-600/50" value={groupFee} onChange={e => setGroupFee(e.target.value)} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white p-4 rounded-lg shadow-sm border border-blue-200 flex-1 flex flex-col">
+                                    <h4 className="font-bold text-blue-800 mb-3 border-b pb-2 flex justify-between items-center">
+                                        <span>3. Link Siblings (Manual)</span><span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">{members.length} Selected</span>
+                                    </h4>
+                                    
+                                    <div className="flex space-x-2 mb-3 bg-blue-50 p-2 rounded border border-blue-100">
+                                        <select className="p-2 border rounded text-xs w-2/5 outline-none" value={searchClass} onChange={e => setSearchClass(e.target.value)}><option value="">Class</option>{CLASSES.map(c => <option key={c} value={c}>{c}</option>)}</select>
+                                        <input type="text" placeholder="Search to add..." className="p-2 border rounded text-xs flex-1 outline-none" value={searchName} onChange={e => setSearchName(e.target.value)} />
+                                    </div>
+                                    
+                                    {searchName && searchClass && (
+                                        <div className="mb-3 border border-green-200 rounded max-h-24 overflow-y-auto bg-green-50 shadow-inner">
+                                            {searchResults.length === 0 ? <div className="p-2 text-xs text-gray-500 text-center">No unlinked matches found.</div> : 
+                                                searchResults.map(s => (
+                                                    <div key={s.id} className="flex justify-between items-center p-2 border-b hover:bg-green-100">
+                                                        <span className="text-xs font-bold truncate max-w-[150px]">{s.name}</span>
+                                                        <button type="button" onClick={() => handleAddSiblingAttempt(s)} className="text-[10px] font-bold bg-green-600 text-white px-2 py-1 rounded shadow-sm hover:bg-green-700">ADD</button>
+                                                    </div>
+                                                ))
+                                            }
+                                        </div>
+                                    )}
+                                    
+                                    <div className="space-y-2 overflow-y-auto flex-1 pr-1">
+                                        {members.map(m => (
+                                            <div key={m.id} className={`flex justify-between items-center p-2 rounded border ${m.id === primaryStudent.id ? 'bg-yellow-50 border-yellow-400' : 'bg-gray-50 border-gray-200'}`}>
+                                                <div className="truncate"><span className="font-bold text-sm text-gray-800">{m.name}</span> <span className="text-[10px] text-gray-600 font-medium bg-gray-200 px-1.5 py-0.5 rounded ml-1">Cls {m.studentClass}</span></div>
+                                                {m.id !== primaryStudent.id && <button type="button" onClick={() => removeMember(m.id)} className="text-red-500 hover:text-red-700 p-1"><Icons.Close /></button>}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white px-6 py-4 border-t flex justify-between items-center shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] rounded-b-lg">
+                            {!primaryStudent.isNew && !groupOnly ? <button type="button" onClick={() => setConfirmDeleteOpen(true)} className="text-red-600 font-bold text-sm hover:underline">Delete Record</button> : <span></span>}
+                            <div className="space-x-3">
+                                <button type="button" onClick={onClose} className="px-5 py-2.5 border border-gray-300 rounded-md hover:bg-gray-50 font-bold text-gray-700 transition-colors">Cancel</button>
+                                <button type="button" onClick={handleSave} className="px-8 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-yellow-950 rounded-md font-extrabold shadow-md transition-colors">{groupOnly ? 'Save Group Setup' : 'Save All Details'}</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Nested Confirms */}
+                    <CustomConfirm 
+                        isOpen={!!conflictStudent} 
+                        title="Conflict Detected" 
+                        message={`Primary Phone: ${phone}\nSibling Phone: ${conflictStudent?.phone}\n\nDo you want to overwrite and keep the Primary Phone for all members?`} 
+                        confirmText="Keep Primary" onConfirm={() => proceedAddSibling(conflictStudent, true)} 
+                        onCancel={() => proceedAddSibling(conflictStudent, false)} 
+                        type="info"
+                    />
+                    <CustomConfirm 
+                        isOpen={confirmDeleteOpen} title="Delete Student" 
+                        message="Permanently delete this student record? All payment history will be lost. This cannot be undone." 
+                        confirmText="Yes, Delete" onConfirm={executeDelete} onCancel={() => setConfirmDeleteOpen(false)} 
+                    />
+                </div>
+            );
+        };
+
+        // --- MULTI MONTH PAYMENT MODAL ---
+        const MultiPaymentModal = ({ selectedItems, onClose, onSaved, showAlert }) => {
+            const [receipt, setReceipt] = useState('');
+            const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
+            const [amount, setAmount] = useState(selectedItems.reduce((sum, item) => sum + parseInt(item.groupFee || 0), 0));
+            const totalDue = selectedItems.reduce((sum, item) => sum + parseInt(item.groupFee || 0), 0);
+            const grouped = selectedItems.reduce((acc, item) => {
+                const name = item.members.map(m => m.name).join(', ');
+                acc.push({ ...item, studentNames: name });
+                return acc;
+            }, []);
+
+            const handleSave = async (e) => {
+                e.preventDefault();
+                const paidAmount = parseInt(amount);
+                if (!receipt.trim()) return showAlert('Receipt number is required for multi-entry payment.', 'Missing Receipt');
+                if (isNaN(paidAmount) || paidAmount <= 0) return showAlert('Valid amount is required.', 'Invalid Amount');
+                const batchId = 'BATCH_' + Date.now();
+                let remaining = paidAmount;
+                const batch = db.batch();
+
+                selectedItems.forEach(item => {
+                    const due = parseInt(item.groupFee || 0);
+                    const applied = Math.max(0, Math.min(remaining, due));
+                    remaining -= applied;
+                    const arrearsAdded = Math.max(0, due - applied);
+                    const paymentData = {
+                        amount: applied,
+                        status: arrearsAdded > 0 ? 'PARTIAL' : 'FULL',
+                        receipt: receipt.trim().toUpperCase(),
+                        date: payDate,
+                        timestamp: new Date().toISOString(),
+                        arrearsAdded,
+                        batchId,
+                        batchTotal: paidAmount,
+                        batchMonths: selectedItems.map(i => i.month),
+                        isSharedFamilyPayment: item.members.length > 1,
+                        groupId: item.groupId
+                    };
+                    item.members.forEach(m => {
+                        batch.update(db.collection('students').doc(m.id), {
+                            [`payments.${item.month}`]: paymentData,
+                            pendingArrears: firebase.firestore.FieldValue.increment(arrearsAdded)
+                        });
+                    });
+                });
+                await batch.commit();
+                onSaved();
+            };
+
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[85] p-4">
+                    <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden">
+                        <div className="bg-green-700 px-6 py-4 flex justify-between items-center text-white"><h3 className="text-lg font-bold">Selected Fee Entry</h3><button onClick={onClose}><Icons.Close /></button></div>
+                        <form onSubmit={handleSave} className="p-6 space-y-4">
+                            <div className="border rounded-lg overflow-hidden max-h-56 overflow-y-auto">
+                                <table className="w-full text-sm"><thead className="bg-gray-100 text-xs uppercase"><tr><th className="p-2 text-left">Student / Group</th><th className="p-2">Month</th><th className="p-2 text-right">Due</th></tr></thead><tbody>{grouped.map(item => <tr key={item.key} className="border-t"><td className="p-2 font-bold text-gray-800">{item.studentNames}</td><td className="p-2 text-center font-bold">{item.month}</td><td className="p-2 text-right font-black">₹{item.groupFee}</td></tr>)}</tbody></table>
+                            </div>
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex justify-between font-black text-green-900"><span>Total Selected</span><span>₹{totalDue}</span></div>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div><label className="block text-xs font-bold text-gray-500 mb-1">Date</label><input type="date" required className="w-full border rounded p-2 font-bold" value={payDate} onChange={e => setPayDate(e.target.value)} /></div>
+                                <div><label className="block text-xs font-bold text-gray-500 mb-1">Receipt No</label><input type="text" required className="w-full border rounded p-2 font-bold uppercase" value={receipt} onChange={e => setReceipt(e.target.value)} /></div>
+                                <div><label className="block text-xs font-bold text-gray-500 mb-1">Amount Paid</label><input type="number" required min="1" className="w-full border rounded p-2 font-black" value={amount} onChange={e => setAmount(e.target.value)} /></div>
+                            </div>
+                            <div className="flex justify-end gap-2 pt-3 border-t"><button type="button" onClick={onClose} className="px-4 py-2 border rounded font-bold">Cancel</button><button type="submit" className="px-6 py-2 bg-green-700 text-white rounded font-bold shadow">Save Entry</button></div>
+                        </form>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- GROUP PAYMENT MODAL (Added Date Field) ---
+        const GroupPaymentModal = ({ context, onClose, showAlert }) => {
+            const { members, month, groupFee, existingPayment } = context;
+            const [amount, setAmount] = useState(existingPayment ? existingPayment.amount : groupFee);
+            const [receipt, setReceipt] = useState(existingPayment ? (existingPayment.receipt || '') : '');
+            const [payDate, setPayDate] = useState(existingPayment?.date || new Date().toISOString().split('T')[0]);
+            const [confirmDel, setConfirmDel] = useState(false);
+
+            const handleSave = async (e) => {
+                e.preventDefault();
+                const paidAmount = parseInt(amount);
+                if (isNaN(paidAmount) || paidAmount <= 0) return showAlert("Valid amount is required", "Invalid Amount");
+
+                let arrearsAdded = 0; let status = 'FULL';
+                if (paidAmount < groupFee) { status = 'PARTIAL'; arrearsAdded = groupFee - paidAmount; } 
+                else if (paidAmount > groupFee) { arrearsAdded = groupFee - paidAmount; }
+
+                let currentArrears = parseInt(members[0].pendingArrears || 0);
+                if (existingPayment && existingPayment.arrearsAdded) currentArrears -= existingPayment.arrearsAdded;
+                
+                const newArrears = Math.max(0, currentArrears + arrearsAdded);
+
+                const paymentData = {
+                    amount: paidAmount, status: status, receipt: receipt, date: payDate,
+                    timestamp: new Date().toISOString(), arrearsAdded: Math.max(0, arrearsAdded),
+                    isSharedFamilyPayment: members.length > 1, groupId: members[0].groupId
+                };
+
+                const batch = db.batch();
+                members.forEach(m => {
+                    batch.update(db.collection('students').doc(m.id), { [`payments.${month}`]: paymentData, pendingArrears: newArrears });
+                });
+                await batch.commit();
+                onClose();
+            };
+
+            const handleDelete = async () => {
+                const arrearsToRevert = existingPayment?.arrearsAdded || 0;
+                const batch = db.batch();
+                members.forEach(m => {
+                    batch.update(db.collection('students').doc(m.id), { [`payments.${month}`]: firebase.firestore.FieldValue.delete(), pendingArrears: firebase.firestore.FieldValue.increment(arrearsToRevert) });
+                });
+                await batch.commit();
+                onClose();
+            };
+
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[80] p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-md w-full overflow-hidden">
+                        <div className="bg-green-600 px-6 py-4 flex justify-between items-center text-white"><h3 className="text-lg font-bold">Monthly Fee - {month}</h3><button onClick={onClose}><Icons.Close /></button></div>
+                        <form onSubmit={handleSave} className="p-6 space-y-4">
+                            <div className="bg-gray-50 p-3 rounded border text-sm text-gray-700 mb-4">
+                                <p className="font-bold border-b pb-1 mb-2">Paying for {members.length} Student(s):</p>
+                                <div className="space-y-1 mb-2 max-h-20 overflow-y-auto">{members.map(m => <div key={m.id} className="text-xs font-bold">• {m.name}</div>)}</div>
+                                <p className="text-lg font-bold text-green-800 mt-2 border-t pt-2 flex justify-between"><span>Due Amount:</span> <span>₹{groupFee}</span></p>
+                            </div>
+                            
+                            <div><label className="block text-sm font-bold text-gray-700 mb-1">Date of Payment</label><input type="date" required className="w-full px-4 py-2 border rounded-md font-bold text-gray-800 outline-none focus:ring-2 focus:ring-green-500" value={payDate} onChange={e => setPayDate(e.target.value)} /></div>
+                            <div><label className="block text-sm font-bold text-gray-700 mb-1">Amount Paid (₹)</label><input type="number" required min="1" className="w-full px-4 py-3 border rounded-md text-2xl font-bold outline-none focus:ring-2 focus:ring-green-500" value={amount} onChange={e => setAmount(e.target.value)} /></div>
+                            <div><label className="block text-sm font-bold text-gray-700 mb-1">Receipt No (Optional)</label><input type="text" className="w-full px-4 py-2 border rounded-md uppercase font-bold outline-none focus:ring-2 focus:ring-green-500" value={receipt} onChange={e => setReceipt(e.target.value)} /></div>
+                            
+                            <div className="pt-4 flex justify-between mt-6">
+                                {existingPayment ? <button type="button" onClick={() => setConfirmDel(true)} className="text-red-600 font-bold px-3 py-2 border border-transparent hover:border-red-200 rounded">Delete Record</button> : <div></div>}
+                                <div className="space-x-3"><button type="button" onClick={onClose} className="px-4 py-2 font-bold text-gray-600 border rounded hover:bg-gray-50">Cancel</button><button type="submit" className="px-6 py-2 bg-green-600 text-white rounded-md font-bold shadow-md hover:bg-green-700">Save</button></div>
+                            </div>
+                        </form>
+                    </div>
+                    <CustomConfirm isOpen={confirmDel} title="Delete Payment" message="Are you sure you want to delete this payment record? This will adjust arrears automatically." confirmText="Delete" onConfirm={handleDelete} onCancel={() => setConfirmDel(false)} />
+                </div>
+            );
+        };
+
+        // --- EXTRA FEE MODAL (Detailed pay/update/edit flow) ---
+        const ExtraFeeModal = ({ student, settings, onClose, showAlert }) => {
+            if (!student) return null;
+            const applicableFees = settings.extraFees?.filter(f => feeAppliesToStudent(f, student.studentClass)) || [];
+            const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
+            const [receipt, setReceipt] = useState('');
+            const [activeFeeId, setActiveFeeId] = useState(null);
+            const [amountInput, setAmountInput] = useState('');
+            const [entryMode, setEntryMode] = useState('PAY');
+
+            const totalExtra = applicableFees.reduce((sum, fee) => sum + feeAmountForStudent(fee, student.studentClass), 0);
+            const totalPaid = Object.values(student.extraFeePayments || {}).reduce((sum, p) => sum + parseInt(p.amount || 0), 0);
+            const totalBalance = Math.max(0, totalExtra - totalPaid);
+
+            const beginEntry = (fee, mode) => {
+                const expected = feeAmountForStudent(fee, student.studentClass);
+                const payment = student.extraFeePayments?.[fee.id];
+                const paid = parseInt(payment?.amount || 0);
+                const balance = Math.max(0, expected - paid);
+                setActiveFeeId(fee.id);
+                setEntryMode(mode);
+                setPayDate(payment?.date || new Date().toISOString().split('T')[0]);
+                setReceipt(payment?.receipt || '');
+                setAmountInput(mode === 'EDIT' ? paid : (balance || expected));
+            };
+
+            const cancelEntry = () => { setActiveFeeId(null); setReceipt(''); setAmountInput(''); setEntryMode('PAY'); setPayDate(new Date().toISOString().split('T')[0]); };
+
+            const savePayment = async (fee) => {
+                const expected = feeAmountForStudent(fee, student.studentClass);
+                const existing = student.extraFeePayments?.[fee.id];
+                const existingPaid = parseInt(existing?.amount || 0);
+                const inputAmount = parseInt(amountInput || 0);
+                if (isNaN(inputAmount) || inputAmount <= 0) return showAlert('Enter a valid amount.', 'Invalid Amount');
+                const finalAmount = entryMode === 'EDIT' ? inputAmount : existingPaid + inputAmount;
+                if (finalAmount > expected) return showAlert(`Amount cannot exceed total fee ₹${expected}.`, 'Invalid Amount');
+                const paymentObj = { amount: finalAmount, date: payDate, receipt: receipt.trim().toUpperCase(), timestamp: new Date().toISOString(), total: expected, balance: Math.max(0, expected - finalAmount) };
+                await db.collection('students').doc(student.id).update({ [`extraFeePayments.${fee.id}`]: paymentObj });
+                cancelEntry();
+            };
+
+            const handleDelete = async (feeId) => {
+                if (!confirm('Delete this extra fee payment record?')) return;
+                await db.collection('students').doc(student.id).update({ [`extraFeePayments.${feeId}`]: firebase.firestore.FieldValue.delete() });
+            };
+
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[80] p-4">
+                    <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full overflow-hidden">
+                        <div className="bg-purple-600 px-6 py-4 flex justify-between items-center text-white">
+                            <div><h3 className="text-lg font-bold">Extra Fees - {student.name}</h3><p className="text-xs text-purple-100">Total: ₹{totalExtra} • Paid: ₹{totalPaid} • Balance: ₹{totalBalance}</p></div><button onClick={onClose}><Icons.Close /></button>
+                        </div>
+                        <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+                            {applicableFees.length === 0 ? <p className="text-gray-500 text-center py-4">No extra fees configured for Class {student.studentClass}.</p> : applicableFees.map(fee => {
+                                const expected = feeAmountForStudent(fee, student.studentClass);
+                                const payment = student.extraFeePayments?.[fee.id];
+                                const paid = parseInt(payment?.amount || 0);
+                                const balance = Math.max(0, expected - paid);
+                                const isActive = activeFeeId === fee.id;
+                                return (
+                                    <div key={fee.id} className={`border rounded-xl p-4 ${balance === 0 && paid > 0 ? 'border-green-200 bg-green-50' : 'border-purple-200 bg-purple-50'}`}>
+                                        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
+                                            <div>
+                                                <h4 className="font-black text-purple-950">{fee.name}</h4>
+                                                <div className="grid grid-cols-3 gap-2 text-xs mt-2">
+                                                    <div className="bg-white rounded border p-2"><span className="block text-gray-500 font-bold">Total</span><span className="font-black">₹{expected}</span></div>
+                                                    <div className="bg-white rounded border p-2"><span className="block text-gray-500 font-bold">Paid</span><span className="font-black text-green-700">₹{paid}</span></div>
+                                                    <div className="bg-white rounded border p-2"><span className="block text-gray-500 font-bold">Balance</span><span className={`font-black ${balance > 0 ? 'text-red-700' : 'text-green-700'}`}>₹{balance}</span></div>
+                                                </div>
+                                                {payment && <p className="text-xs text-gray-600 mt-2">Last Date: {payment.date || '-'} • Receipt: {payment.receipt || 'N/A'}</p>}
+                                            </div>
+                                            <div className="flex md:flex-col gap-2 justify-end">
+                                                {!payment && <button onClick={() => beginEntry(fee, 'PAY')} className="px-3 py-1.5 bg-purple-600 text-white rounded text-xs font-bold shadow">Pay</button>}
+                                                {payment && balance > 0 && <button onClick={() => beginEntry(fee, 'UPDATE')} className="px-3 py-1.5 bg-green-600 text-white rounded text-xs font-bold shadow">Update</button>}
+                                                {payment && <button onClick={() => beginEntry(fee, 'EDIT')} className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-bold shadow">Edit</button>}
+                                                {payment && <button onClick={() => handleDelete(fee.id)} className="px-3 py-1.5 bg-red-100 text-red-700 rounded text-xs font-bold">Delete</button>}
+                                            </div>
+                                        </div>
+                                        {isActive && <div className="bg-white p-3 rounded-lg shadow-inner mt-4 space-y-3 border">
+                                            <div className="font-bold text-sm text-purple-900">{entryMode === 'EDIT' ? 'Edit Payment' : entryMode === 'UPDATE' ? 'Pay Pending Balance' : 'New Payment'} - {fee.name}</div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
+                                                <div><label className="text-xs font-bold text-gray-500">Date</label><input type="date" className="w-full border p-2 rounded" value={payDate} onChange={e => setPayDate(e.target.value)} /></div>
+                                                <div><label className="text-xs font-bold text-gray-500">Receipt No</label><input type="text" className="w-full border p-2 rounded uppercase" value={receipt} onChange={e => setReceipt(e.target.value)} /></div>
+                                                <div><label className="text-xs font-bold text-gray-500">Amount</label><input type="number" className="w-full border p-2 rounded font-bold" value={amountInput} onChange={e => setAmountInput(e.target.value)} /></div>
+                                            </div>
+                                            <div className="flex justify-end space-x-2 pt-2 border-t"><button onClick={cancelEntry} className="px-3 py-1.5 bg-gray-200 rounded text-xs font-bold">Cancel</button><button onClick={() => savePayment(fee)} className="px-4 py-1.5 bg-purple-600 text-white rounded text-xs font-bold shadow">Save</button></div>
+                                        </div>}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+
+        // --- CLASS MANAGEMENT TAB ---
+        const ClassManagementTab = ({ students, showAlert }) => {
+            const [confirmClass, setConfirmClass] = useState(null);
+            const classRows = CLASSES.map(cls => {
+                const clsStudents = students.filter(s => s.studentClass === cls);
+                return {
+                    cls,
+                    students: clsStudents,
+                    boys: clsStudents.filter(s => s.gender === 'M').length,
+                    girls: clsStudents.filter(s => s.gender === 'F').length,
+                    total: clsStudents.length
+                };
+            });
+            const totalBoys = classRows.reduce((sum, row) => sum + row.boys, 0);
+            const totalGirls = classRows.reduce((sum, row) => sum + row.girls, 0);
+            const grandTotal = classRows.reduce((sum, row) => sum + row.total, 0);
+
+            const executeDeleteClass = async () => {
+                if (!confirmClass) return;
+                const targets = students.filter(s => s.studentClass === confirmClass.cls);
+                for (let i = 0; i < targets.length; i += 450) {
+                    const batch = db.batch();
+                    targets.slice(i, i + 450).forEach(student => batch.delete(db.collection('students').doc(student.id)));
+                    await batch.commit();
+                }
+                showAlert(`Class ${confirmClass.cls} deleted successfully. ${targets.length} student record(s) removed.`, 'Class Deleted');
+                setConfirmClass(null);
+            };
+
+            return (
+                <div className="max-w-5xl mx-auto space-y-5">
+                    <div className="bg-gradient-to-r from-blue-700 to-indigo-600 text-white rounded-2xl p-6 shadow-lg">
+                        <h2 className="text-2xl font-black">Class Management</h2>
+                        <p className="text-blue-100 text-sm">Class-wise boys, girls and total student strength with class delete action.</p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4"><div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center"><div className="text-xs font-bold text-blue-600 uppercase">Total Boys</div><div className="text-3xl font-black text-blue-800">{totalBoys}</div></div><div className="bg-pink-50 border border-pink-200 rounded-xl p-4 text-center"><div className="text-xs font-bold text-pink-600 uppercase">Total Girls</div><div className="text-3xl font-black text-pink-800">{totalGirls}</div></div><div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-center"><div className="text-xs font-bold text-gray-600 uppercase">Grand Total</div><div className="text-3xl font-black text-gray-900">{grandTotal}</div></div></div>
+                    <div className="bg-white border rounded-xl shadow overflow-hidden">
+                        <table className="min-w-full text-sm">
+                            <thead className="bg-gray-100 text-gray-700 uppercase text-xs"><tr><th className="p-3 text-left">Class</th><th className="p-3 text-center">Boys</th><th className="p-3 text-center">Girls</th><th className="p-3 text-center">Total</th><th className="p-3 text-right">Action</th></tr></thead>
+                            <tbody>{classRows.map(row => <tr key={row.cls} className="border-t hover:bg-blue-50"><td className="p-3 font-black text-blue-900">Class {row.cls}</td><td className="p-3 text-center font-bold text-blue-700">{row.boys}</td><td className="p-3 text-center font-bold text-pink-700">{row.girls}</td><td className="p-3 text-center font-black text-gray-900">{row.total}</td><td className="p-3 text-right"><button disabled={row.total === 0} onClick={() => setConfirmClass(row)} className="px-4 py-2 bg-red-600 text-white rounded font-bold text-xs shadow hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed">Delete</button></td></tr>)}</tbody><tfoot className="bg-gray-900 text-white font-black"><tr><td className="p-3">TOTAL</td><td className="p-3 text-center">{totalBoys}</td><td className="p-3 text-center">{totalGirls}</td><td className="p-3 text-center">{grandTotal}</td><td></td></tr></tfoot>
+                        </table>
+                    </div>
+                    <CustomConfirm isOpen={!!confirmClass} title="Delete Class" message={`Delete Class ${confirmClass?.cls}? This will permanently delete ${confirmClass?.total || 0} student record(s) in this class. This cannot be undone.`} confirmText="Delete Class" onConfirm={executeDeleteClass} onCancel={() => setConfirmClass(null)} />
+                </div>
+            );
+        };
+
+        // --- SETTINGS TAB (Institution profile, Academic Year & Extra Fees Master) ---
+        const SettingsTab = ({ settings, ALL_MONTHS_BASE, showAlert }) => {
+            const [baseFee, setBaseFee] = useState(settings.globalBaseFee || 500);
+            const [startMonth, setStartMonth] = useState(settings.academicStartMonth || 'Jun');
+            const [endMonth, setEndMonth] = useState(settings.academicEndMonth || 'May');
+            const [institutionName, setInstitutionName] = useState(settings.institutionName || '');
+            const [institutionPlace, setInstitutionPlace] = useState(settings.institutionPlace || '');
+            const [registerNumber, setRegisterNumber] = useState(settings.registerNumber || '');
+            const [logo, setLogo] = useState(settings.logo || '');
+            const [extraFees, setExtraFees] = useState(settings.extraFees || []);
+            const [saving, setSaving] = useState(false);
+
+            const [newFeeName, setNewFeeName] = useState('');
+            const [newFeeMode, setNewFeeMode] = useState('ALL');
+            const [newFeeAmount, setNewFeeAmount] = useState('');
+            const [newFeeClass, setNewFeeClass] = useState('+2');
+            const [classAmounts, setClassAmounts] = useState(Object.fromEntries(CLASSES.map(c => [c, ''])));
+            const [editingFeeId, setEditingFeeId] = useState(null);
+            const [editFeeModalOpen, setEditFeeModalOpen] = useState(false);
+
+            useEffect(() => { setExtraFees(settings.extraFees || []); }, [settings.extraFees]);
+
+            const resetFeeForm = () => {
+                setNewFeeName(''); setNewFeeAmount(''); setNewFeeMode('ALL'); setNewFeeClass('+2'); setEditingFeeId(null); setEditFeeModalOpen(false); setClassAmounts(Object.fromEntries(CLASSES.map(c => [c, ''])));
+            };
+            const persistExtraFees = async (nextFees, successMessage) => {
+                setExtraFees(nextFees);
+                await db.collection('settings').doc('global').set({ extraFees: nextFees }, { merge: true });
+                if (successMessage) showAlert(successMessage, 'Success');
+            };
+
+            const addExtraFee = async () => {
+                if(!newFeeName) return showAlert("Please enter Fee Name.", "Missing Info");
+                let newFee = { id: 'FEE_' + Date.now(), name: newFeeName.toUpperCase(), mode: newFeeMode };
+                if (newFeeMode === 'MULTI') {
+                    const cleaned = Object.fromEntries(Object.entries(classAmounts).map(([k,v]) => [k, parseInt(v || 0)]));
+                    if (!Object.values(cleaned).some(v => v > 0)) return showAlert("Enter at least one class amount.", "Missing Info");
+                    newFee.classAmounts = cleaned; newFee.applyTo = 'MULTI'; newFee.amount = 0;
+                } else {
+                    if(!newFeeAmount) return showAlert("Please enter amount.", "Missing Info");
+                    newFee.amount = parseInt(newFeeAmount); newFee.applyTo = newFeeMode === 'ALL' ? 'ALL' : newFeeClass;
+                }
+                const nextFees = editingFeeId ? extraFees.map(f => f.id === editingFeeId ? { ...newFee, id: editingFeeId } : f) : [...extraFees, newFee];
+                await persistExtraFees(nextFees, editingFeeId ? 'Extra fee item updated and saved.' : 'Extra fee item added and saved.');
+                resetFeeForm();
+            };
+            const removeExtraFee = async (id) => {
+                if (!confirm('Delete this extra fee item?')) return;
+                await persistExtraFees(extraFees.filter(f => f.id !== id), 'Extra fee item deleted.');
+                if (editingFeeId === id) resetFeeForm();
+            };
+            const startEditFee = (fee) => {
+                setEditingFeeId(fee.id); setNewFeeName(fee.name || '');
+                const mode = fee.mode || (fee.applyTo === 'ALL' ? 'ALL' : 'SINGLE');
+                setNewFeeMode(mode); setNewFeeAmount(fee.amount || ''); setNewFeeClass(fee.applyTo && fee.applyTo !== 'ALL' && fee.applyTo !== 'MULTI' ? fee.applyTo : '+2');
+                setClassAmounts(Object.fromEntries(CLASSES.map(c => [c, fee.classAmounts?.[c] || ''])));
+                setEditFeeModalOpen(true);
+            };
+            const describeFee = (fee) => fee.mode === 'MULTI' ? 'Different amount for each class' : (fee.applyTo === 'ALL' ? 'All classes - same amount' : `Only Class ${fee.applyTo}`);
+            const displayAmount = (fee) => fee.mode === 'MULTI' ? CLASSES.map(c => `${c}: ₹${fee.classAmounts?.[c] || 0}`).join(' | ') : `₹${fee.amount}`;
+
+            const handleSave = async (e) => {
+                e.preventDefault(); setSaving(true);
+                await db.collection('settings').doc('global').set({ 
+                    globalBaseFee: parseInt(baseFee), academicStartMonth: startMonth, academicEndMonth: endMonth,
+                    institutionName: institutionName.trim(), institutionPlace: institutionPlace.trim(), registerNumber: registerNumber.trim(), logo: logo.trim(), extraFees
+                }, { merge: true });
+                setSaving(false); showAlert("Settings updated successfully!", "Success");
+            };
+
+            return (
+                <>
+                <div className="max-w-6xl mx-auto mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100 flex flex-col">
+                        <div className="flex items-center mb-6 border-b pb-4"><div className="p-3 bg-green-100 text-green-700 rounded-lg mr-4"><Icons.Settings /></div><div><h2 className="text-xl font-bold">Institution & General Configuration</h2></div></div>
+                        <form onSubmit={handleSave} className="flex-1 flex flex-col">
+                            <div className="space-y-4 flex-1">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div><label className="block text-sm font-bold mb-1 text-gray-700">Institution Name</label><input className="w-full px-4 py-2 border rounded-md font-bold outline-none" value={institutionName} onChange={e => setInstitutionName(e.target.value)} /></div>
+                                    <div><label className="block text-sm font-bold mb-1 text-gray-700">Place</label><input className="w-full px-4 py-2 border rounded-md font-bold outline-none" value={institutionPlace} onChange={e => setInstitutionPlace(e.target.value)} /></div>
+                                    <div><label className="block text-sm font-bold mb-1 text-gray-700">Register Number</label><input className="w-full px-4 py-2 border rounded-md font-bold outline-none" value={registerNumber} onChange={e => setRegisterNumber(e.target.value)} /></div>
+                                    <div><label className="block text-sm font-bold mb-1 text-gray-700">Logo URL / Base64</label><input className="w-full px-4 py-2 border rounded-md outline-none" value={logo} onChange={e => setLogo(e.target.value)} /></div>
+                                </div>
+                                {logo && <img src={logo} className="w-20 h-20 rounded-full object-cover border" />}
+                                <div><label className="block text-sm font-bold mb-1 text-gray-700">Default Base Fee (₹)</label><input type="number" required min="0" className="w-full px-4 py-2 border rounded-md text-lg font-bold outline-none" value={baseFee} onChange={e => setBaseFee(e.target.value)} /></div>
+                                <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg"><label className="block text-sm font-bold mb-3 text-blue-900">Academic Year Months</label><div className="grid grid-cols-2 gap-4"><select className="w-full p-2 border rounded bg-white" value={startMonth} onChange={e => setStartMonth(e.target.value)}>{ALL_MONTHS_BASE.map(m => <option key={m}>{m}</option>)}</select><select className="w-full p-2 border rounded bg-white" value={endMonth} onChange={e => setEndMonth(e.target.value)}>{ALL_MONTHS_BASE.map(m => <option key={m}>{m}</option>)}</select></div></div>
+                            </div>
+                            <button type="submit" disabled={saving} className="mt-6 w-full py-3 bg-green-600 hover:bg-green-700 rounded-md font-bold text-white shadow-md">{saving ? 'Saving...' : 'Save All Settings'}</button>
+                        </form>
+                    </div>
+                    <div className="bg-white p-6 rounded-xl shadow-md border border-purple-100 flex flex-col">
+                        <div className="flex items-center mb-6 border-b border-purple-100 pb-4"><div className="p-3 bg-purple-100 text-purple-700 rounded-lg mr-4"><Icons.PlusCircle /></div><div><h2 className="text-xl font-bold text-purple-900">Extra Fees Master</h2><p className="text-xs text-purple-600">All classes same, one class only, or different amount per class.</p></div></div>
+                        <div className="bg-purple-50 p-4 rounded-lg border border-purple-200 mb-4 space-y-3">
+                            <input type="text" placeholder="Fee Name (e.g. EXAM FEE)" className="w-full p-2 text-sm border rounded uppercase" value={newFeeName} onChange={e => setNewFeeName(e.target.value)} />
+                            <select className="w-full p-2 text-sm border rounded" value={newFeeMode} onChange={e => setNewFeeMode(e.target.value)}><option value="ALL">All classes - same amount</option><option value="SINGLE">Only one class</option><option value="MULTI">Different amount for every class</option></select>
+                            {newFeeMode !== 'MULTI' ? <div className="flex gap-2"><input type="number" placeholder="Amount (₹)" className="flex-1 p-2 text-sm border rounded font-bold" value={newFeeAmount} onChange={e => setNewFeeAmount(e.target.value)} />{newFeeMode === 'SINGLE' && <select className="flex-1 p-2 text-sm border rounded" value={newFeeClass} onChange={e => setNewFeeClass(e.target.value)}>{CLASSES.map(c => <option key={c} value={c}>Class {c}</option>)}</select>}</div> : <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">{CLASSES.map(c => <input key={c} type="number" placeholder={`Class ${c}`} className="p-2 text-sm border rounded" value={classAmounts[c]} onChange={e => setClassAmounts({...classAmounts, [c]: e.target.value})} />)}</div>}
+                            <button onClick={addExtraFee} type="button" className="w-full bg-purple-600 text-white py-2 text-sm font-bold rounded shadow hover:bg-purple-700">Add Fee Item</button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto space-y-2">
+                            {extraFees.length === 0 ? <p className="text-sm text-gray-500 text-center py-4">No Extra Fees configured.</p> : extraFees.map(fee => <div key={fee.id} className={`bg-white border p-3 rounded shadow-sm ${editingFeeId === fee.id ? 'border-purple-400 ring-2 ring-purple-100' : 'border-gray-200'}`}><div className="flex justify-between gap-3"><div><div className="font-bold text-sm text-gray-800">{fee.name}</div><div className="text-[10px] font-bold text-purple-600 bg-purple-100 px-1 inline-block rounded mt-1">{describeFee(fee)}</div><div className="text-xs text-gray-600 mt-1 break-words">{displayAmount(fee)}</div></div><div className="flex items-start gap-2"><button onClick={() => startEditFee(fee)} className="text-blue-600 hover:text-blue-800 text-xs font-bold px-2 py-1 border border-blue-200 rounded">Edit</button><button onClick={() => removeExtraFee(fee.id)} className="text-red-500 hover:text-red-700 p-1"><Icons.Trash /></button></div></div></div>)}
+                        </div>
+                    </div>
+                </div>
+                    {editFeeModalOpen && <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[90] p-4">
+                        <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden">
+                            <div className="bg-purple-700 text-white px-6 py-4 flex justify-between items-center"><h3 className="font-black text-lg">Edit Extra Fee Item</h3><button onClick={resetFeeForm}><Icons.Close /></button></div>
+                            <div className="p-6 space-y-3">
+                                <input type="text" placeholder="Fee Name" className="w-full p-2 text-sm border rounded uppercase" value={newFeeName} onChange={e => setNewFeeName(e.target.value)} />
+                                <select className="w-full p-2 text-sm border rounded" value={newFeeMode} onChange={e => setNewFeeMode(e.target.value)}><option value="ALL">All classes - same amount</option><option value="SINGLE">Only one class</option><option value="MULTI">Different amount for every class</option></select>
+                                {newFeeMode !== 'MULTI' ? <div className="flex gap-2"><input type="number" placeholder="Amount (₹)" className="flex-1 p-2 text-sm border rounded font-bold" value={newFeeAmount} onChange={e => setNewFeeAmount(e.target.value)} />{newFeeMode === 'SINGLE' && <select className="flex-1 p-2 text-sm border rounded" value={newFeeClass} onChange={e => setNewFeeClass(e.target.value)}>{CLASSES.map(c => <option key={c} value={c}>Class {c}</option>)}</select>}</div> : <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-64 overflow-y-auto">{CLASSES.map(c => <input key={c} type="number" placeholder={`Class ${c}`} className="p-2 text-sm border rounded" value={classAmounts[c]} onChange={e => setClassAmounts({...classAmounts, [c]: e.target.value})} />)}</div>}
+                                <div className="flex justify-end gap-2 pt-3 border-t"><button onClick={resetFeeForm} className="px-4 py-2 bg-gray-200 rounded font-bold">Cancel</button><button onClick={addExtraFee} className="px-6 py-2 bg-purple-700 text-white rounded font-bold shadow">Update Fee Item</button></div>
+                            </div>
+                        </div>
+                    </div>}
+                </>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
