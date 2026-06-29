@@ -158,22 +158,55 @@ const { useState, useEffect, useMemo, useRef } = React;
 
         const DashboardTab = ({ students, settings, dynamicMonths }) => {
             const totalStudents = students.length;
-            const groups = new Set(students.map(s => s.groupId)).size;
-            const monthlyCollected = students.reduce((sum, s) => sum + Object.values(s.payments || {}).reduce((a, p) => a + parseInt(p.amount || 0), 0), 0);
+            const groupMap = students.reduce((acc, student) => {
+                const key = student.groupId || student.id;
+                if (!acc.has(key)) acc.set(key, []);
+                acc.get(key).push(student);
+                return acc;
+            }, new Map());
+            const groups = groupMap.size;
+            const groupRows = Array.from(groupMap.entries()).map(([groupId, members]) => {
+                const groupFee = members[0]?.groupFee || (members.length * settings.globalBaseFee);
+                const expected = groupFee * dynamicMonths.length;
+                const collected = dynamicMonths.reduce((sum, month) => sum + parseInt(members[0]?.payments?.[month]?.amount || 0), 0);
+                return { groupId, members, groupFee, expected, collected, balance: Math.max(0, expected - collected) };
+            });
+            const monthlyExpected = groupRows.reduce((sum, group) => sum + group.expected, 0);
+            const monthlyCollected = groupRows.reduce((sum, group) => sum + group.collected, 0);
+            const monthlyBalance = Math.max(0, monthlyExpected - monthlyCollected);
+            const extraExpected = students.reduce((sum, student) => sum + (settings.extraFees || []).filter(fee => feeAppliesToStudent(fee, student.studentClass)).reduce((feeSum, fee) => feeSum + feeAmountForStudent(fee, student.studentClass), 0), 0);
             const extraCollected = students.reduce((sum, s) => sum + Object.values(s.extraFeePayments || {}).reduce((a, p) => a + parseInt(p.amount || 0), 0), 0);
+            const extraBalance = Math.max(0, extraExpected - extraCollected);
             const arrears = students.reduce((sum, s) => sum + parseInt(s.pendingArrears || 0), 0);
-            const paidCells = students.reduce((sum, s) => sum + dynamicMonths.filter(m => s.payments?.[m]).length, 0);
-            const totalCells = totalStudents * dynamicMonths.length;
-            const classRows = CLASSES.map(cls => ({ cls, count: students.filter(s => s.studentClass === cls).length, boys: students.filter(s => s.studentClass === cls && s.gender === 'M').length, girls: students.filter(s => s.studentClass === cls && s.gender === 'F').length })).filter(r => r.count);
+            const paidCells = groupRows.reduce((sum, group) => sum + dynamicMonths.filter(month => group.members[0]?.payments?.[month]).length, 0);
+            const totalCells = groups * dynamicMonths.length;
+            const completion = totalCells ? Math.round((paidCells / totalCells) * 100) : 0;
+            const collectionRate = monthlyExpected ? Math.round((monthlyCollected / monthlyExpected) * 100) : 0;
+            const boysTotal = students.filter(s => s.gender === 'M').length;
+            const girlsTotal = students.filter(s => s.gender === 'F').length;
+            const classRows = CLASSES.map(cls => {
+                const classStudents = students.filter(s => s.studentClass === cls);
+                const boys = classStudents.filter(s => s.gender === 'M').length;
+                const girls = classStudents.filter(s => s.gender === 'F').length;
+                const collected = groupRows.reduce((sum, group) => sum + group.members.filter(member => member.studentClass === cls).reduce((inner, member) => inner + dynamicMonths.reduce((monthSum, month) => monthSum + parseInt(member.payments?.[month]?.amount || 0), 0), 0), 0);
+                return { cls, count: classStudents.length, boys, girls, collected, percent: totalStudents ? Math.round((classStudents.length / totalStudents) * 100) : 0 };
+            }).filter(row => row.count);
+            const statCards = [
+                [totalStudents, 'Total Students', 'bg-blue-600'],
+                [groups, 'Fee Groups', 'bg-yellow-600'],
+                [`${collectionRate}%`, 'Monthly Collection Rate', 'bg-green-600'],
+                [`₹${monthlyBalance}`, 'Monthly Balance', 'bg-red-600'],
+                [`₹${extraBalance}`, 'Extra Fee Balance', 'bg-purple-600']
+            ];
             return <div className="space-y-6">
-                <div className="bg-gradient-to-r from-green-700 to-emerald-600 text-white rounded-2xl p-6 shadow-lg"><h2 className="text-2xl font-black">Dashboard</h2><p className="text-green-100">Students, family fee groups, collections and pending dues at a glance.</p></div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
-                    {[[totalStudents,'Total Students','bg-blue-600'],[groups,'Fee Groups','bg-yellow-600'],[`₹${monthlyCollected}`,'Monthly Collected','bg-green-600'],[`₹${extraCollected}`,'Extra Fee Collected','bg-purple-600'],[`₹${arrears}`,'Pending Arrears','bg-red-600']].map(([v,l,c]) => <div className={`${c} text-white rounded-xl p-5 shadow`}><div className="text-3xl font-black">{v}</div><div className="text-sm opacity-90 font-bold">{l}</div></div>)}
-                </div>
+                <div className="bg-gradient-to-r from-green-700 to-emerald-600 text-white rounded-2xl p-6 shadow-lg"><h2 className="text-2xl font-black">Dashboard</h2><p className="text-green-100">Complete student strength, monthly fee targets, collections, balances and class-wise breakdown.</p></div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">{statCards.map(([v,l,c]) => <div key={l} className={`${c} text-white rounded-xl p-5 shadow`}><div className="text-3xl font-black">{v}</div><div className="text-sm opacity-90 font-bold">{l}</div></div>)}</div>
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="lg:col-span-2 bg-white rounded-xl border shadow p-5"><h3 className="font-black text-gray-800 mb-4">Class Strength</h3><div className="space-y-3">{classRows.map(r => <div key={r.cls}><div className="flex justify-between text-sm font-bold"><span>Class {r.cls}</span><span>{r.count} ({r.boys} M / {r.girls} F)</span></div><div className="h-2 bg-gray-100 rounded"><div className="h-2 bg-green-500 rounded" style={{width: `${Math.max(5,(r.count/Math.max(1,totalStudents))*100)}%`}}></div></div></div>)}</div></div>
-                    <div className="bg-white rounded-xl border shadow p-5"><h3 className="font-black text-gray-800 mb-4">Fee Completion</h3><div className="text-5xl font-black text-green-700">{totalCells ? Math.round((paidCells/totalCells)*100) : 0}%</div><p className="text-sm text-gray-500 mt-2">{paidCells} of {totalCells} monthly fee entries recorded.</p><div className="mt-4 h-3 bg-gray-100 rounded"><div className="h-3 bg-green-600 rounded" style={{width: `${totalCells ? (paidCells/totalCells)*100 : 0}%`}}></div></div></div>
+                    <div className="lg:col-span-2 bg-white rounded-xl border shadow p-5"><h3 className="font-black text-gray-800 mb-4">Fee Collection Breakdown</h3><div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">{[[monthlyExpected,'Total Monthly Demand'],[monthlyCollected,'Total Monthly Collected'],[monthlyBalance,'Total Monthly Pending']].map(([v,l]) => <div key={l} className="rounded-lg border bg-gray-50 p-3"><div className="text-xs font-bold text-gray-500 uppercase">{l}</div><div className="text-2xl font-black text-gray-900">₹{v}</div></div>)}</div><div className="h-4 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-green-600" style={{width: `${Math.min(100, collectionRate)}%`}}></div></div><div className="mt-2 text-sm font-bold text-gray-600">Collected {collectionRate}% • {paidCells}/{totalCells} month entries completed</div></div>
+                    <div className="bg-white rounded-xl border shadow p-5"><h3 className="font-black text-gray-800 mb-4">Student Mix</h3><div className="grid grid-cols-2 gap-3"><div className="rounded-xl bg-blue-50 border border-blue-100 p-4 text-center"><div className="text-3xl font-black text-blue-700">{boysTotal}</div><div className="text-xs font-bold text-blue-600">Boys</div></div><div className="rounded-xl bg-pink-50 border border-pink-100 p-4 text-center"><div className="text-3xl font-black text-pink-700">{girlsTotal}</div><div className="text-xs font-bold text-pink-600">Girls</div></div></div><div className="mt-4"><div className="text-5xl font-black text-green-700">{completion}%</div><p className="text-sm text-gray-500">Overall fee completion</p></div></div>
                 </div>
+                <div className="bg-white rounded-xl border shadow p-5"><h3 className="font-black text-gray-800 mb-4">Class Strength & Collection Table</h3><div className="overflow-x-auto"><table className="w-full text-sm border"><thead className="bg-gray-100"><tr><th className="p-2 border text-left">Class</th><th className="p-2 border text-center">Total</th><th className="p-2 border text-center">Boys</th><th className="p-2 border text-center">Girls</th><th className="p-2 border text-left">Strength Graph</th><th className="p-2 border text-right">Collected</th></tr></thead><tbody>{classRows.map(row => <tr key={row.cls} className="border-t"><td className="p-2 border font-black">{row.cls}</td><td className="p-2 border text-center font-bold">{row.count}</td><td className="p-2 border text-center text-blue-700 font-bold">{row.boys}</td><td className="p-2 border text-center text-pink-700 font-bold">{row.girls}</td><td className="p-2 border"><div className="flex items-center gap-2"><div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-green-600" style={{width: `${Math.max(4, row.percent)}%`}}></div></div><span className="text-xs font-bold text-gray-500">{row.percent}%</span></div></td><td className="p-2 border text-right font-bold">₹{row.collected}</td></tr>)}</tbody></table></div></div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4"><div className="bg-white rounded-xl border shadow p-5"><h4 className="font-black text-gray-800">Extra Fees</h4><p className="text-sm text-gray-500">Expected ₹{extraExpected} • Collected ₹{extraCollected}</p><div className="mt-3 h-3 bg-gray-100 rounded"><div className="h-3 bg-purple-600 rounded" style={{width: `${extraExpected ? Math.min(100,(extraCollected/extraExpected)*100) : 0}%`}}></div></div></div><div className="bg-white rounded-xl border shadow p-5"><h4 className="font-black text-gray-800">Pending Arrears</h4><div className="text-3xl font-black text-red-600">₹{arrears}</div><p className="text-sm text-gray-500">Student-wise carried balance</p></div><div className="bg-white rounded-xl border shadow p-5"><h4 className="font-black text-gray-800">Largest Class</h4><div className="text-3xl font-black text-green-700">{classRows.sort((a,b)=>b.count-a.count)[0]?.cls || '-'}</div><p className="text-sm text-gray-500">Highest current class strength</p></div></div>
             </div>;
         };
 
