@@ -369,8 +369,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                 const doc = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
                 const title = `${settings.institutionName || 'Madrasa Fee Manager'} - Fee Table`;
                 const subtitle = `${settings.institutionPlace || ''} ${settings.registerNumber ? `• Reg: ${settings.registerNumber}` : ''}`.trim();
-                const columns = ['No', 'Class', 'Student Name', 'Guardian', 'Phone', 'Group Fee', 'Extra Total', 'Extra Balance', 'Arrears', ...dynamicMonths];
-                const rows = visibleStudentRows.map((student, idx) => {
+                const preparedRows = visibleStudentRows.map((student, idx) => {
                     const groupMembers = student.displayMembers || getGroupMembers(student.groupId);
                     const groupFee = student.groupFee || (groupMembers.length * settings.globalBaseFee);
                     const classText = groupMembers.map(member => member.studentClass).join('\n');
@@ -379,14 +378,30 @@ const { useState, useEffect, useMemo, useRef } = React;
                     const totalExFee = appExtraFees.reduce((sum, f) => sum + feeAmountForStudent(f, student.studentClass), 0);
                     const paidExFee = Object.values(student.extraFeePayments || {}).reduce((sum, p) => sum + parseInt(p.amount || 0), 0);
                     const dueExFee = Math.max(0, totalExFee - paidExFee);
+                    const arrears = parseInt(student.pendingArrears || 0);
                     const monthValues = dynamicMonths.map(month => {
                         const payment = student.payments?.[month];
                         if (!payment) return 'Not Paid';
                         const balance = payment.balance ?? payment.arrearsAdded ?? 0;
                         const credit = payment.credit || 0;
-                        return [`Paid: ₹${payment.amount || 0}`, payment.receipt ? `Rec: ${payment.receipt}` : '', payment.date ? `Date: ${payment.date}` : '', balance > 0 ? `Bal: ₹${balance}` : '', credit > 0 ? `Credit: ₹${credit}` : ''].filter(Boolean).join('\n');
+                        return [`Paid: ${payment.amount || 0}`, payment.receipt ? `Rec: ${payment.receipt}` : '', payment.date ? `Date: ${payment.date}` : '', balance > 0 ? `Bal: ${balance}` : '', credit > 0 ? `Credit: ${credit}` : ''].filter(Boolean).join('\n');
                     });
-                    return [idx + 1, classText, nameText, student.guardian || '-', student.phone || '-', `₹${groupFee}`, `₹${totalExFee}`, `₹${dueExFee}`, student.pendingArrears > 0 ? `₹${student.pendingArrears}` : '0', ...monthValues];
+                    return { idx: idx + 1, classText, nameText, guardian: student.guardian || '-', phone: student.phone || '-', groupFee, totalExFee, dueExFee, arrears, monthValues };
+                });
+                const includeExtraTotal = preparedRows.some(row => row.totalExFee > 0);
+                const includeExtraBalance = preparedRows.some(row => row.dueExFee > 0);
+                const includeArrears = preparedRows.some(row => row.arrears > 0);
+                const columns = ['No', 'Class', 'Student Name', 'Guardian', 'Phone', 'Group Fee'];
+                if (includeExtraTotal) columns.push('Extra Total');
+                if (includeExtraBalance) columns.push('Extra Balance');
+                if (includeArrears) columns.push('Arrears');
+                columns.push(...dynamicMonths);
+                const rows = preparedRows.map(row => {
+                    const cells = [row.idx, row.classText, row.nameText, row.guardian, row.phone, String(row.groupFee || 0)];
+                    if (includeExtraTotal) cells.push(row.totalExFee > 0 ? String(row.totalExFee) : '');
+                    if (includeExtraBalance) cells.push(row.dueExFee > 0 ? String(row.dueExFee) : '');
+                    if (includeArrears) cells.push(row.arrears > 0 ? String(row.arrears) : '');
+                    return [...cells, ...row.monthValues];
                 });
 
                 doc.setFontSize(14);
