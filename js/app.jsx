@@ -364,6 +364,18 @@ const { useState, useEffect, useMemo, useRef } = React;
                 setMultiPaymentModalOpen(true);
             };
             const clearMultiSelection = () => setSelectedMonthPayments([]);
+            const downloadTablePdf = () => {
+                const table = document.getElementById('student-table-export');
+                if (!table || !window.html2pdf) return showAlert('PDF export library is still loading. Please try again.', 'PDF Download');
+                const fileName = `${settings.institutionName || 'madrasa'}-fee-table.pdf`.replace(/\s+/g, '-').toLowerCase();
+                window.html2pdf().set({
+                    margin: 0.15,
+                    filename: fileName,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
+                    jsPDF: { unit: 'in', format: 'a3', orientation: 'landscape' }
+                }).from(table).save();
+            };
             const openFullStudentEditor = (student) => {
                 setProfileModalOpen(false);
                 setSelectedFamilyStudent(student);
@@ -438,6 +450,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                 </button>
                             </div>
 
+                            <button onClick={downloadTablePdf} className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded font-medium text-sm transition-colors shadow-sm">Download PDF</button>
                             <button onClick={handleAddSingle} className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded font-medium text-sm transition-colors shadow-sm">+ Add Student</button>
                         </div>
                     </div>
@@ -451,13 +464,13 @@ const { useState, useEffect, useMemo, useRef } = React;
                     )}
 
                     {/* Data Table */}
-                    <div className="table-container border rounded-lg shadow-sm bg-white">
+                    <div id="student-table-export" className="table-container border rounded-lg shadow-sm bg-white">
                         <table className="min-w-full text-sm text-left whitespace-nowrap">
                             <thead className="student-table-head text-xs text-gray-700 uppercase bg-gray-100 shadow-sm border-b">
                                 <tr>
-                                    <th className="px-3 py-2 w-10">No</th>
-                                    <th className="px-3 py-2 w-14">Class</th>
-                                    <th className="px-3 py-2">Student Name</th>
+                                    <th className="px-3 py-2 w-10 border-r">No</th>
+                                    <th className="px-3 py-2 w-14 border-r">Class</th>
+                                    <th className="px-3 py-2 border-r">Student Name</th>
                                     <th className="px-3 py-2 border-r">Guardian & Contact</th>
                                     <th className="px-3 py-2 text-center bg-yellow-50 text-yellow-800 border-r w-24">Group Setup</th>
                                     <th className="px-3 py-2 text-center bg-purple-50 text-purple-800 border-r w-24">Extra Fees</th>
@@ -483,12 +496,12 @@ const { useState, useEffect, useMemo, useRef } = React;
 
                                         return (
                                             <tr key={student.id} className="bg-white border-b hover:bg-green-50 transition-colors">
-                                                <td className="px-3 py-2 text-gray-500 text-xs">{idx + 1}</td>
-                                                <td className="px-3 py-2 font-bold align-top">
+                                                <td className="px-3 py-2 text-gray-500 text-xs border-r">{idx + 1}</td>
+                                                <td className="px-3 py-2 font-bold align-top border-r">
                                                     <div className="space-y-1">{groupMembers.map((member) => <div key={member.id} className={member.id === student.id ? 'text-gray-900' : 'text-gray-600'}>{member.studentClass}</div>)}</div>
                                                 </td>
                                                 
-                                                <td className="px-3 py-2 align-top">
+                                                <td className="px-3 py-2 align-top border-r">
                                                     <div className="space-y-1">
                                                         {groupMembers.map((member, memberIdx) => <div key={member.id} className="flex items-center">
                                                             <span className={`${member.id === student.id ? 'font-bold text-blue-700 hover:text-blue-900' : 'font-semibold text-gray-700'} cursor-pointer hover:underline truncate max-w-[220px]`} onClick={() => { setSelectedProfile(member); setProfileModalOpen(true); }}>
