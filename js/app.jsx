@@ -240,6 +240,7 @@ const { useState, useEffect, useMemo, useRef } = React;
             const fileInputRef = useRef(null);
             const [uploading, setUploading] = useState(false);
             const [selectedUploadClass, setSelectedUploadClass] = useState('');
+            const [importPreview, setImportPreview] = useState(null);
 
             const getGroupMembers = (groupId) => students.filter(s => s.groupId === groupId);
 
@@ -324,46 +325,103 @@ const { useState, useEffect, useMemo, useRef } = React;
             }, [filteredStudents, students, classFilter]);
 
             const triggerFileUpload = () => {
-                if (!selectedUploadClass) return showAlert("Please select a Target Class before uploading CSV.", "Upload Error");
+                if (!selectedUploadClass) return showAlert("Please select a Target Class before uploading CSV/Excel.", "Upload Error");
                 fileInputRef.current.click();
+            };
+
+            const valueFromRow = (row, aliases) => aliases.map(alias => row[alias]).find(value => value !== undefined && value !== null && String(value).trim() !== '') || '';
+            const normalizePhoneText = (value) => String(value || '').replace(/\.0$/, '').trim();
+            const normalizeImportRows = (rows) => {
+                const aliases = {
+                    name: ['Name', 'Student Name', 'Full Name'], guardian: ['Father', 'Guardian'], phone: ['Mobile', 'Phone'], gender: ['Gender'],
+                    dob: ['DOB', 'Date of Birth'], address: ['Permanent Address', 'Address'], adhaar: ['Adhaar', 'Aadhaar'], admNo: ['Adm. No', 'Admission No', 'Adm No'], admDate: ['Adm. Date', 'Admission Date'], samasthaId: ['ID', 'Samastha ID']
+                };
+                const existingAdmNos = new Set(students.map(s => String(s.profile?.admNo || '').trim()).filter(Boolean));
+                const fileAdmNos = new Set();
+                return rows.map((row, idx) => {
+                    const rawName = valueFromRow(row, aliases.name);
+                    const admNo = normalizePhoneText(valueFromRow(row, aliases.admNo));
+                    const duplicate = admNo && (existingAdmNos.has(admNo) || fileAdmNos.has(admNo));
+                    if (admNo) fileAdmNos.add(admNo);
+                    const status = !rawName ? 'Missing Name' : (duplicate ? 'Duplicate Adm No' : 'Ready');
+                    const studentData = {
+                        name: String(rawName || '').trim().toUpperCase(),
+                        studentClass: selectedUploadClass,
+                        gender: String(valueFromRow(row, aliases.gender) || '').trim().toUpperCase().startsWith('F') ? 'F' : 'M',
+                        guardian: String(valueFromRow(row, aliases.guardian) || '').trim().toUpperCase(),
+                        phone: normalizePhoneText(valueFromRow(row, aliases.phone)),
+                        pendingArrears: 0, groupFee: null, payments: {}, extraFeePayments: {},
+                        groupId: db.collection('students').doc().id,
+                        profile: {
+                            dob: String(valueFromRow(row, aliases.dob) || '').trim(), address: String(valueFromRow(row, aliases.address) || '').trim(),
+                            adhaar: normalizePhoneText(valueFromRow(row, aliases.adhaar)), admNo,
+                            samasthaId: String(valueFromRow(row, aliases.samasthaId) || '').trim(), admDate: String(valueFromRow(row, aliases.admDate) || '').trim()
+                        }
+                    };
+                    return { rowNo: idx + 1, status, valid: status === 'Ready', studentData };
+                });
+            };
+
+            const openImportPreview = (rows, fileName) => {
+                const parsedRows = normalizeImportRows(rows);
+                const summary = {
+                    total: parsedRows.length,
+                    ready: parsedRows.filter(r => r.valid).length,
+                    skipped: parsedRows.filter(r => !r.valid).length,
+                    missing: parsedRows.filter(r => r.status === 'Missing Name').length,
+                    duplicates: parsedRows.filter(r => r.status === 'Duplicate Adm No').length
+                };
+                setImportPreview({ fileName, rows: parsedRows, summary, targetClass: selectedUploadClass });
+                setUploading(false);
             };
 
             const handleFileUpload = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
                 setUploading(true);
-                Papa.parse(file, {
-                    header: true, skipEmptyLines: true,
-                    complete: async (results) => {
+                const lowerName = file.name.toLowerCase();
+                if (lowerName.endsWith('.csv')) {
+                    Papa.parse(file, {
+                        header: true, skipEmptyLines: true,
+                        complete: (results) => openImportPreview(results.data || [], file.name),
+                        error: () => { setUploading(false); showAlert("Error reading CSV file.", "Upload Error"); }
+                    });
+                } else if (lowerName.endsWith('.xlsx') || lowerName.endsWith('.xls')) {
+                    if (!window.XLSX) { setUploading(false); return showAlert('Excel upload library is still loading. Please try again.', 'Upload Error'); }
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
                         try {
-                            const batch = db.batch();
-                            results.data.forEach(row => {
-                                const rawName = row['Name'] || row['Student Name'] || row['Full Name'] || '';
-                                if (!rawName) return; 
-                                const studentData = {
-                                    name: rawName.trim().toUpperCase(),
-                                    studentClass: selectedUploadClass,
-                                    gender: (row['Gender'] || '').trim().toUpperCase().startsWith('F') ? 'F' : 'M',
-                                    guardian: (row['Father'] || row['Guardian'] || '').trim().toUpperCase(),
-                                    phone: (row['Mobile'] || row['Phone'] || '').trim(),
-                                    pendingArrears: 0, groupFee: null, payments: {}, extraFeePayments: {},
-                                    groupId: db.collection('students').doc().id, 
-                                    profile: {
-                                        dob: row['DOB'] || '', address: row['Permanent Address'] || '',
-                                        adhaar: row['Adhaar'] || '', admNo: row['Adm. No'] || '',
-                                        samasthaId: row['ID'] || '', admDate: row['Adm. Date'] || ''
-                                    }
-                                };
-                                batch.set(db.collection('students').doc(studentData.groupId), studentData);
-                            });
-                            await batch.commit();
-                            showAlert(`Students imported successfully to Class ${selectedUploadClass}`, "Success");
+                            const workbook = window.XLSX.read(event.target.result, { type: 'array', cellDates: false });
+                            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                            const rows = window.XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
+                            openImportPreview(rows, file.name);
                         } catch (err) {
-                            showAlert("Error uploading data. Check CSV format.", "Upload Error");
+                            setUploading(false); showAlert('Error reading Excel file. Please check the format.', 'Upload Error');
                         }
-                        setUploading(false); setSelectedUploadClass(''); e.target.value = null;
-                    }
-                });
+                    };
+                    reader.onerror = () => { setUploading(false); showAlert('Unable to read the selected file.', 'Upload Error'); };
+                    reader.readAsArrayBuffer(file);
+                } else {
+                    setUploading(false); showAlert('Please upload a CSV, XLSX, or XLS file.', 'Upload Error');
+                }
+                e.target.value = null;
+            };
+
+            const confirmImport = async () => {
+                if (!importPreview) return;
+                const validRows = importPreview.rows.filter(row => row.valid);
+                if (!validRows.length) return showAlert('No valid rows to import.', 'Import Error');
+                setUploading(true);
+                try {
+                    const batch = db.batch();
+                    validRows.forEach(row => batch.set(db.collection('students').doc(row.studentData.groupId), row.studentData));
+                    await batch.commit();
+                    showAlert(`${validRows.length} students imported successfully to Class ${importPreview.targetClass}.`, 'Success');
+                    setSelectedUploadClass(''); setImportPreview(null);
+                } catch (err) {
+                    showAlert('Error saving imported students. Please try again.', 'Upload Error');
+                }
+                setUploading(false);
             };
 
             const handleAddSingle = () => {
@@ -566,9 +624,9 @@ const { useState, useEffect, useMemo, useRef } = React;
                                     <option value="">-- Target Class --</option>
                                     {CLASSES.map(c => <option key={c} value={c}>Class {c}</option>)}
                                 </select>
-                                <input type="file" accept=".csv" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
+                                <input type="file" accept=".csv,.xlsx,.xls" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
                                 <button onClick={triggerFileUpload} disabled={uploading} className="flex items-center bg-blue-700 hover:bg-blue-800 text-white px-2 py-1 rounded font-medium text-xs disabled:opacity-50 ml-1">
-                                    <Icons.Upload /> {uploading ? 'Wait...' : 'CSV Upload'}
+                                    <Icons.Upload /> {uploading ? 'Wait...' : 'CSV / Excel Upload'}
                                 </button>
                             </div>
 
@@ -668,11 +726,31 @@ const { useState, useEffect, useMemo, useRef } = React;
                         </table>
                     </div>
 
+                    {importPreview && <ImportPreviewModal preview={importPreview} onCancel={() => setImportPreview(null)} onConfirm={confirmImport} importing={uploading} />}
                     {familyModalOpen && <FamilySetupModal primaryStudent={selectedFamilyStudent} allStudents={students} globalBaseFee={settings.globalBaseFee} groupOnly={groupOnlyMode} onClose={() => setFamilyModalOpen(false)} showAlert={showAlert}/>}
                     {paymentModalOpen && <GroupPaymentModal context={paymentGroupData} onClose={() => setPaymentModalOpen(false)} showAlert={showAlert}/>}
                     {multiPaymentModalOpen && <MultiPaymentModal selectedItems={selectedMonthPayments} onClose={() => setMultiPaymentModalOpen(false)} onSaved={() => { setMultiPaymentModalOpen(false); clearMultiSelection(); }} showAlert={showAlert}/>}
                     {extraFeeModalOpen && <ExtraFeeModal student={extraFeeStudentData} settings={settings} onClose={() => setExtraFeeModalOpen(false)} showAlert={showAlert}/>}
                     {profileModalOpen && <StudentProfileModal student={selectedProfile} onClose={() => setProfileModalOpen(false)} onEdit={() => openFullStudentEditor(selectedProfile)} showAlert={showAlert} />}
+                </div>
+            );
+        };
+
+        const ImportPreviewModal = ({ preview, onCancel, onConfirm, importing }) => {
+            const rowsForDisplay = preview.rows.slice(0, 80);
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[95] p-4">
+                    <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full overflow-hidden">
+                        <div className="bg-blue-700 text-white px-6 py-4 flex justify-between items-center"><div><h3 className="font-black text-lg">Import Preview - Class {preview.targetClass}</h3><p className="text-xs text-blue-100">{preview.fileName}</p></div><button onClick={onCancel}><Icons.Close /></button></div>
+                        <div className="p-5 space-y-4">
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-center">
+                                {[[preview.summary.total,'Total Rows'],[preview.summary.ready,'Ready'],[preview.summary.skipped,'Skipped'],[preview.summary.missing,'Missing Name'],[preview.summary.duplicates,'Duplicates']].map(([v,l]) => <div key={l} className="rounded-lg border bg-gray-50 p-3"><div className="text-2xl font-black">{v}</div><div className="text-xs font-bold text-gray-500">{l}</div></div>)}
+                            </div>
+                            <div className="max-h-[55vh] overflow-auto border rounded"><table className="min-w-full text-xs"><thead className="bg-gray-100 sticky top-0"><tr><th className="p-2 border">No</th><th className="p-2 border text-left">Name</th><th className="p-2 border">Gender</th><th className="p-2 border text-left">Guardian</th><th className="p-2 border">Mobile</th><th className="p-2 border">Adm No</th><th className="p-2 border">Status</th></tr></thead><tbody>{rowsForDisplay.map(row => <tr key={row.rowNo} className={row.valid ? 'bg-white' : 'bg-red-50'}><td className="p-2 border text-center">{row.rowNo}</td><td className="p-2 border font-bold">{row.studentData.name || '-'}</td><td className="p-2 border text-center">{row.studentData.gender}</td><td className="p-2 border">{row.studentData.guardian || '-'}</td><td className="p-2 border text-center">{row.studentData.phone || '-'}</td><td className="p-2 border text-center">{row.studentData.profile.admNo || '-'}</td><td className={`p-2 border text-center font-black ${row.valid ? 'text-green-700' : 'text-red-700'}`}>{row.status}</td></tr>)}</tbody></table></div>
+                            {preview.rows.length > rowsForDisplay.length && <p className="text-xs text-gray-500 font-bold">Showing first {rowsForDisplay.length} rows only. Confirm will import all ready rows.</p>}
+                            <div className="flex justify-end gap-2 border-t pt-4"><button onClick={onCancel} className="px-4 py-2 border rounded font-bold">Cancel</button><button onClick={onConfirm} disabled={importing || preview.summary.ready === 0} className="px-6 py-2 rounded bg-blue-700 text-white font-bold disabled:opacity-50">{importing ? 'Importing...' : `Confirm Import (${preview.summary.ready})`}</button></div>
+                        </div>
+                    </div>
                 </div>
             );
         };
