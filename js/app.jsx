@@ -141,7 +141,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                         {activeTab === 'DASHBOARD' && <DashboardTab students={students} settings={settings} dynamicMonths={dynamicMonths} />}
                         {activeTab === 'STUDENTS' && <StudentTab students={students} settings={settings} dynamicMonths={dynamicMonths} showAlert={showAlert} />}
                         {activeTab === 'CLASSES' && <ClassManagementTab students={students} showAlert={showAlert} />}
-                        {activeTab === 'SETTINGS' && <SettingsTab settings={settings} ALL_MONTHS_BASE={ALL_MONTHS_BASE} showAlert={showAlert} />}
+                        {activeTab === 'SETTINGS' && <SettingsTab settings={settings} students={students} ALL_MONTHS_BASE={ALL_MONTHS_BASE} showAlert={showAlert} />}
                     </main>
 
                     <CustomAlert isOpen={alertState.isOpen} title={alertState.title} message={alertState.message} onClose={() => setAlertState({ isOpen: false, title: '', message: '' })} />
@@ -1258,7 +1258,7 @@ const { useState, useEffect, useMemo, useRef } = React;
         };
 
         // --- SETTINGS TAB (Institution profile, Academic Year & Extra Fees Master) ---
-        const SettingsTab = ({ settings, ALL_MONTHS_BASE, showAlert }) => {
+        const SettingsTab = ({ settings, students, ALL_MONTHS_BASE, showAlert }) => {
             const [baseFee, setBaseFee] = useState(settings.globalBaseFee || 500);
             const [startMonth, setStartMonth] = useState(settings.academicStartMonth || 'Jun');
             const [endMonth, setEndMonth] = useState(settings.academicEndMonth || 'May');
@@ -1333,6 +1333,25 @@ const { useState, useEffect, useMemo, useRef } = React;
                 reader.onerror = () => showAlert('Unable to read the selected image.', 'Logo Upload Error');
                 reader.readAsDataURL(file);
             };
+            const downloadBlob = (content, fileName, type) => {
+                const blob = new Blob([content], { type });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = fileName;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(url);
+            };
+            const downloadCsvTemplate = () => {
+                const headers = ['Adm. No','Name','Gender','Father','Mobile','DOB','Permanent Address','Adhaar','ID','Adm. Date'];
+                downloadBlob(`${headers.join(',')}\n`, 'student-import-template.csv', 'text/csv;charset=utf-8');
+            };
+            const exportBackup = () => {
+                const backup = { exportedAt: new Date().toISOString(), settings: { ...settings, extraFees }, students };
+                downloadBlob(JSON.stringify(backup, null, 2), `madrasa-backup-${new Date().toISOString().split('T')[0]}.json`, 'application/json');
+            };
 
             const handleSave = async (e) => {
                 e.preventDefault(); setSaving(true);
@@ -1366,6 +1385,13 @@ const { useState, useEffect, useMemo, useRef } = React;
                             </div>
                             <button type="submit" disabled={saving} className="mt-6 w-full py-3 bg-green-600 hover:bg-green-700 rounded-md font-bold text-white shadow-md">{saving ? 'Saving...' : 'Save All Settings'}</button>
                         </form>
+                    </div>
+                    <div className="bg-white p-6 rounded-xl shadow-md border border-blue-100 lg:col-span-2">
+                        <div className="flex items-center mb-4 border-b border-blue-100 pb-3"><div className="p-3 bg-blue-100 text-blue-700 rounded-lg mr-4"><Icons.Upload /></div><div><h2 className="text-xl font-bold text-blue-900">Data Tools</h2><p className="text-xs text-blue-600">Backup and import helpers for non-login app maintenance.</p></div></div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <button type="button" onClick={downloadCsvTemplate} className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-left hover:bg-blue-100"><span className="block font-black text-blue-900">Download CSV Template</span><span className="text-xs text-blue-700">Use this format for student imports.</span></button>
+                            <button type="button" onClick={exportBackup} className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-left hover:bg-green-100"><span className="block font-black text-green-900">Export Full Backup</span><span className="text-xs text-green-700">Downloads settings and all students as JSON.</span></button>
+                        </div>
                     </div>
                     <div className="bg-white p-6 rounded-xl shadow-md border border-purple-100 flex flex-col">
                         <div className="flex items-center mb-6 border-b border-purple-100 pb-4"><div className="p-3 bg-purple-100 text-purple-700 rounded-lg mr-4"><Icons.PlusCircle /></div><div><h2 className="text-xl font-bold text-purple-900">Extra Fees Master</h2><p className="text-xs text-purple-600">All classes same, one class only, or different amount per class.</p></div></div>
