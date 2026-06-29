@@ -269,6 +269,25 @@ const { useState, useEffect, useMemo, useRef } = React;
                 return result;
             }, [students, search, classFilter, statusFilter, sortOption, genderSort, settings.globalBaseFee]);
 
+            const visibleStudentRows = useMemo(() => {
+                const seenGroups = new Set();
+                return filteredStudents.reduce((rows, student) => {
+                    const members = getGroupMembers(student.groupId).sort((a, b) => {
+                        const classDiff = CLASSES.indexOf(a.studentClass) - CLASSES.indexOf(b.studentClass);
+                        if (classDiff) return classDiff;
+                        return (a.name || '').localeCompare(b.name || '');
+                    });
+                    if (members.length > 1) {
+                        if (seenGroups.has(student.groupId)) return rows;
+                        seenGroups.add(student.groupId);
+                        rows.push({ ...members[0], displayMembers: members, isGroupedDisplay: true });
+                        return rows;
+                    }
+                    rows.push({ ...student, displayMembers: [student], isGroupedDisplay: false });
+                    return rows;
+                }, []);
+            }, [filteredStudents, students]);
+
             const triggerFileUpload = () => {
                 if (!selectedUploadClass) return showAlert("Please select a Target Class before uploading CSV.", "Upload Error");
                 fileInputRef.current.click();
@@ -441,14 +460,12 @@ const { useState, useEffect, useMemo, useRef } = React;
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredStudents.length === 0 ? (
+                                {visibleStudentRows.length === 0 ? (
                                     <tr><td colSpan={7 + dynamicMonths.length} className="text-center py-8 text-gray-500">No students match the current filters.</td></tr>
                                 ) : (
-                                    filteredStudents.map((student, idx) => {
-                                        const groupMembers = getGroupMembers(student.groupId);
-                                        const groupMembersByClass = [...groupMembers].sort((a, b) => CLASSES.indexOf(a.studentClass) - CLASSES.indexOf(b.studentClass));
-                                        const isGroup = groupMembers.length > 1;
-                                        const showGuardian = !isGroup || groupMembersByClass[0]?.id === student.id;
+                                    visibleStudentRows.map((student, idx) => {
+                                        const groupMembers = student.displayMembers || getGroupMembers(student.groupId);
+                                        const isGroup = student.isGroupedDisplay || groupMembers.length > 1;
                                         const actualFee = student.groupFee || (groupMembers.length * settings.globalBaseFee);
                                         const hasConcession = student.groupFee !== null && student.groupFee !== (groupMembers.length * settings.globalBaseFee);
                                         
@@ -461,23 +478,25 @@ const { useState, useEffect, useMemo, useRef } = React;
                                         return (
                                             <tr key={student.id} className="bg-white border-b hover:bg-green-50 transition-colors">
                                                 <td className="px-3 py-2 text-gray-500 text-xs">{idx + 1}</td>
-                                                <td className="px-3 py-2 font-bold">{student.studentClass}</td>
+                                                <td className="px-3 py-2 font-bold align-top">
+                                                    <div className="space-y-1">{groupMembers.map((member) => <div key={member.id} className={member.id === student.id ? 'text-gray-900' : 'text-gray-600'}>{member.studentClass}</div>)}</div>
+                                                </td>
                                                 
-                                                <td className="px-3 py-2">
-                                                    <div className="flex items-center">
-                                                        <span className="font-bold text-blue-700 hover:text-blue-900 cursor-pointer hover:underline truncate max-w-[180px]" onClick={() => { setSelectedProfile(student); setProfileModalOpen(true); }}>
-                                                            {student.name}
-                                                        </span>
-                                                        {student.gender === 'M' ? <Icons.Male/> : <Icons.Female/>}
+                                                <td className="px-3 py-2 align-top">
+                                                    <div className="space-y-1">
+                                                        {groupMembers.map((member, memberIdx) => <div key={member.id} className="flex items-center">
+                                                            <span className={`${member.id === student.id ? 'font-bold text-blue-700 hover:text-blue-900' : 'font-semibold text-gray-700'} cursor-pointer hover:underline truncate max-w-[220px]`} onClick={() => { setSelectedProfile(member); setProfileModalOpen(true); }}>
+                                                                {isGroup ? `${memberIdx + 1}. ${member.name}` : member.name}
+                                                            </span>
+                                                            {member.gender === 'M' ? <Icons.Male/> : <Icons.Female/>}
+                                                        </div>)}
                                                     </div>
                                                 </td>
 
-                                                <td className="px-3 py-2 border-r">
+                                                <td className="px-3 py-2 border-r align-top">
                                                     <div className="flex flex-col leading-tight">
-                                                        {showGuardian ? <>
-                                                            <span className="font-semibold text-gray-800 text-xs truncate max-w-[160px]">{student.guardian || '-'}</span>
-                                                            <span className="text-[11px] text-gray-500 font-medium tracking-wide mt-0.5">{student.phone || '-'}</span>
-                                                        </> : <span className="text-[11px] text-gray-400 italic">Same group guardian</span>}
+                                                        <span className="font-semibold text-gray-800 text-xs truncate max-w-[160px]">{student.guardian || '-'}</span>
+                                                        <span className="text-[11px] text-gray-500 font-medium tracking-wide mt-0.5">{student.phone || '-'}</span>
                                                     </div>
                                                 </td>
                                                 
