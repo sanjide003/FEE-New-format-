@@ -469,6 +469,28 @@ const { useState, useEffect, useMemo, useRef } = React;
                 image.onerror = reject;
                 image.src = src;
             });
+            const wrapPdfText = (value, maxChars = 20) => {
+                const text = String(value || '-').trim();
+                if (text.length <= maxChars) return text;
+                const words = text.split(/\s+/);
+                const lines = [];
+                let line = '';
+                words.forEach(word => {
+                    if (word.length > maxChars) {
+                        if (line) { lines.push(line); line = ''; }
+                        for (let i = 0; i < word.length; i += maxChars) lines.push(word.slice(i, i + maxChars));
+                    } else if (!line) {
+                        line = word;
+                    } else if (`${line} ${word}`.length <= maxChars) {
+                        line += ` ${word}`;
+                    } else {
+                        lines.push(line);
+                        line = word;
+                    }
+                });
+                if (line) lines.push(line);
+                return lines.join('\n');
+            };
             const downloadTablePdf = async () => {
                 if (!window.jspdf?.jsPDF) return showAlert('PDF preview library is still loading. Please try again.', 'PDF Preview');
                 const doc = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
@@ -478,7 +500,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                     const groupMembers = student.displayMembers || getGroupMembers(student.groupId);
                     const groupFee = student.groupFee || (groupMembers.length * settings.globalBaseFee);
                     const classText = groupMembers.map(member => member.studentClass).join('\n');
-                    const nameText = groupMembers.map((member, memberIdx) => `${groupMembers.length > 1 ? `${memberIdx + 1}. ` : ''}${member.name || ''}${member.gender ? ` (${member.gender})` : ''}`).join('\n');
+                    const nameText = groupMembers.map((member, memberIdx) => wrapPdfText(`${groupMembers.length > 1 ? `${memberIdx + 1}. ` : ''}${member.name || ''}${member.gender ? ` (${member.gender})` : ''}`, 20)).join('\n');
                     const appExtraFees = settings.extraFees?.filter(f => feeAppliesToStudent(f, student.studentClass)) || [];
                     const totalExFee = appExtraFees.reduce((sum, f) => sum + feeAmountForStudent(f, student.studentClass), 0);
                     const paidExFee = Object.values(student.extraFeePayments || {}).reduce((sum, p) => sum + parseInt(p.amount || 0), 0);
@@ -491,7 +513,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                         const credit = payment.credit || 0;
                         return [payment.receipt || String(payment.amount || 0), balance > 0 ? `Bal: ${balance}` : '', credit > 0 ? `Cr: ${credit}` : ''].filter(Boolean).join('\n');
                     });
-                    return { idx: idx + 1, classText, nameText, guardian: student.guardian || '-', phone: student.phone || '-', groupFee, totalExFee, dueExFee, arrears, monthValues };
+                    return { idx: idx + 1, classText, nameText, guardian: wrapPdfText(student.guardian || '-', 20), phone: student.phone || '-', groupFee, totalExFee, dueExFee, arrears, monthValues };
                 });
                 const includeExtraTotal = preparedRows.some(row => row.totalExFee > 0);
                 const includeExtraBalance = preparedRows.some(row => row.dueExFee > 0);
@@ -522,7 +544,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                     }
                 }
                 const firstMonthColumn = columns.length - dynamicMonths.length;
-                const pdfColumnStyles = { 0: { cellWidth: 24, halign: 'center' }, 1: { cellWidth: 34, halign: 'center' }, 2: { cellWidth: 82 }, 3: { cellWidth: 62 }, 4: { cellWidth: 50, halign: 'center' }, 5: { cellWidth: 38, halign: 'center' } };
+                const pdfColumnStyles = { 0: { cellWidth: 24, halign: 'center' }, 1: { cellWidth: 34, halign: 'center' }, 2: { cellWidth: 92 }, 3: { cellWidth: 82 }, 4: { cellWidth: 50, halign: 'center' }, 5: { cellWidth: 38, halign: 'center' } };
                 columns.forEach((_, columnIndex) => {
                     if (columnIndex >= firstMonthColumn) pdfColumnStyles[columnIndex] = { cellWidth: 30, halign: 'center' };
                 });
