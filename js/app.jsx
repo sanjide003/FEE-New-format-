@@ -280,13 +280,15 @@ const { useState, useEffect, useMemo, useRef } = React;
                     if (members.length > 1) {
                         if (seenGroups.has(student.groupId)) return rows;
                         seenGroups.add(student.groupId);
-                        rows.push({ ...members[0], displayMembers: members, isGroupedDisplay: true });
+                        const anchor = classFilter ? (members.find(member => member.studentClass === classFilter) || members[0]) : members[0];
+                        const displayMembers = [anchor, ...members.filter(member => member.id !== anchor.id)];
+                        rows.push({ ...anchor, displayMembers, isGroupedDisplay: true });
                         return rows;
                     }
                     rows.push({ ...student, displayMembers: [student], isGroupedDisplay: false });
                     return rows;
                 }, []);
-            }, [filteredStudents, students]);
+            }, [filteredStudents, students, classFilter]);
 
             const triggerFileUpload = () => {
                 if (!selectedUploadClass) return showAlert("Please select a Target Class before uploading CSV.", "Upload Error");
@@ -387,8 +389,9 @@ const { useState, useEffect, useMemo, useRef } = React;
                         }
                     }
                     const groupFee = groupMembers[0]?.groupFee || (groupMembers.length * settings.globalBaseFee);
-                    const balance = payment?.arrearsAdded || 0;
-                    cells.push(<td key={month} className={`px-1.5 py-1 border-r cursor-pointer transition-colors min-w-[110px] ${payment ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-red-50'}`} onClick={() => openPaymentModal(groupMembers, month)}><div className="relative"><input type="checkbox" checked={isMonthSelected(groupMembers[0]?.groupId, month)} onChange={(e) => toggleMonthSelection(e, groupMembers, month, groupFee)} onClick={(e) => e.stopPropagation()} className="absolute -top-0.5 -left-0.5 w-3 h-3 accent-green-700" />{!payment ? <div className="min-h-[52px] flex flex-col items-center justify-center text-red-600 pt-2"><span className="w-6 h-6 rounded-full bg-red-100 border border-red-300 flex items-center justify-center text-[10px] font-black">!</span><span className="text-[10px] font-bold mt-1">Not Paid</span>{groupMembers.length > 1 && <button type="button" onClick={(e) => { e.stopPropagation(); openPaymentModal([student], month, settings.globalBaseFee); }} className="mt-1 rounded bg-yellow-100 px-1.5 py-0.5 text-[9px] font-black text-yellow-900 hover:bg-yellow-200">Separate</button>}</div> : <div className={`rounded-lg border p-1.5 text-[10px] leading-tight whitespace-normal shadow-sm ${payment.status === 'FULL' ? 'bg-green-100 border-green-300 text-green-900' : 'bg-yellow-50 border-yellow-300 text-yellow-900'}`}><div className="flex items-center justify-center gap-1 font-black text-[11px] mb-1">{payment.status === 'FULL' ? <span className="text-green-700">✓ Paid</span> : <span className="text-yellow-800">Partial</span>}</div><div className="font-bold">Date: {payment.date || '-'}</div><div className="font-bold">Rec: {payment.receipt || 'N/A'}</div><div>Paid: ₹{payment.amount || 0}</div>{groupMembers.length > 1 && <button type="button" onClick={(e) => { e.stopPropagation(); openPaymentModal([student], month, settings.globalBaseFee); }} className="mt-1 w-full rounded bg-yellow-100 px-1 py-0.5 text-[9px] font-black text-yellow-900 hover:bg-yellow-200">Separate</button>}{balance > 0 && <div className="text-red-700 font-black">Bal: ₹{balance}</div>}</div>}</div></td>);
+                    const balance = payment?.balance ?? payment?.arrearsAdded ?? 0;
+                    const credit = payment?.credit || 0;
+                    cells.push(<td key={month} className={`px-1.5 py-1 border-r cursor-pointer transition-colors min-w-[110px] ${payment ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-red-50'}`} onClick={() => openPaymentModal(groupMembers, month)}><div className="relative"><input type="checkbox" checked={isMonthSelected(groupMembers[0]?.groupId, month)} onChange={(e) => toggleMonthSelection(e, groupMembers, month, groupFee)} onClick={(e) => e.stopPropagation()} className="absolute -top-0.5 -left-0.5 w-3 h-3 accent-green-700" />{!payment ? <div className="min-h-[52px] flex flex-col items-center justify-center text-red-600 pt-2"><span className="w-6 h-6 rounded-full bg-red-100 border border-red-300 flex items-center justify-center text-[10px] font-black">!</span><span className="text-[10px] font-bold mt-1">Not Paid</span>{groupMembers.length > 1 && <button type="button" onClick={(e) => { e.stopPropagation(); openPaymentModal([student], month, settings.globalBaseFee); }} className="mt-1 rounded bg-yellow-100 px-1.5 py-0.5 text-[9px] font-black text-yellow-900 hover:bg-yellow-200">Separate</button>}</div> : <div className={`rounded-lg border p-1.5 text-[10px] leading-tight whitespace-normal shadow-sm ${payment.status === 'FULL' || payment.status === 'CREDIT' ? 'bg-green-100 border-green-300 text-green-900' : 'bg-yellow-50 border-yellow-300 text-yellow-900'}`}><div className="flex items-center justify-center gap-1 font-black text-[11px] mb-1">{payment.status === 'CREDIT' ? <span className="text-blue-700">Credit</span> : (payment.status === 'FULL' ? <span className="text-green-700">✓ Paid</span> : <span className="text-yellow-800">Partial</span>)}</div><div className="font-bold">Date: {payment.date || '-'}</div><div className="font-bold">Rec: {payment.receipt || 'N/A'}</div><div>Paid: ₹{payment.amount || 0}</div>{groupMembers.length > 1 && <button type="button" onClick={(e) => { e.stopPropagation(); openPaymentModal([student], month, settings.globalBaseFee); }} className="mt-1 w-full rounded bg-yellow-100 px-1 py-0.5 text-[9px] font-black text-yellow-900 hover:bg-yellow-200">Separate</button>}{balance > 0 && <div className="text-red-700 font-black">Bal: ₹{balance}</div>}{credit > 0 && <div className="text-blue-700 font-black">Credit: ₹{credit}</div>}</div>}</div></td>);
                     i++;
                 }
                 return cells;
@@ -876,12 +879,21 @@ const { useState, useEffect, useMemo, useRef } = React;
             );
         };
 
-        // --- GROUP PAYMENT MODAL (Added Date Field) ---
+        // --- GROUP PAYMENT MODAL (ledger style entries) ---
         const GroupPaymentModal = ({ context, onClose, showAlert }) => {
             const { members, month, groupFee, existingPayment } = context;
-            const [amount, setAmount] = useState(existingPayment ? existingPayment.amount : groupFee);
-            const [receipt, setReceipt] = useState(existingPayment ? (existingPayment.receipt || '') : '');
-            const [payDate, setPayDate] = useState(existingPayment?.date || new Date().toISOString().split('T')[0]);
+            const previousPaid = parseInt(existingPayment?.amount || 0);
+            const previousBalance = Math.max(0, groupFee - previousPaid);
+            const previousCredit = Math.max(0, previousPaid - groupFee);
+            const existingEntries = existingPayment?.entries || (existingPayment ? [{
+                amount: previousPaid,
+                receipt: existingPayment.receipt || '',
+                date: existingPayment.date || '',
+                timestamp: existingPayment.timestamp || ''
+            }] : []);
+            const [amount, setAmount] = useState(existingPayment ? (previousBalance || '') : groupFee);
+            const [receipt, setReceipt] = useState('');
+            const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
             const [confirmDel, setConfirmDel] = useState(false);
 
             const handleSave = async (e) => {
@@ -889,31 +901,40 @@ const { useState, useEffect, useMemo, useRef } = React;
                 const paidAmount = parseInt(amount);
                 if (isNaN(paidAmount) || paidAmount <= 0) return showAlert("Valid amount is required", "Invalid Amount");
 
-                let arrearsAdded = 0; let status = 'FULL';
-                if (paidAmount < groupFee) { status = 'PARTIAL'; arrearsAdded = groupFee - paidAmount; } 
-                else if (paidAmount > groupFee) { arrearsAdded = groupFee - paidAmount; }
-
-                let currentArrears = parseInt(members[0].pendingArrears || 0);
-                if (existingPayment && existingPayment.arrearsAdded) currentArrears -= existingPayment.arrearsAdded;
-                
-                const newArrears = Math.max(0, currentArrears + arrearsAdded);
+                const entry = { amount: paidAmount, receipt: receipt.trim().toUpperCase(), date: payDate, timestamp: new Date().toISOString() };
+                const totalPaid = previousPaid + paidAmount;
+                const balance = Math.max(0, groupFee - totalPaid);
+                const credit = Math.max(0, totalPaid - groupFee);
+                const previousTrackedBalance = existingPayment ? Math.max(0, groupFee - previousPaid) : 0;
+                const arrearsDelta = balance - previousTrackedBalance;
+                const status = balance > 0 ? 'PARTIAL' : (credit > 0 ? 'CREDIT' : 'FULL');
 
                 const paymentData = {
-                    amount: paidAmount, status: status, receipt: receipt, date: payDate,
-                    timestamp: new Date().toISOString(), arrearsAdded: Math.max(0, arrearsAdded),
-                    isSharedFamilyPayment: members.length > 1, groupId: members[0].groupId
+                    amount: totalPaid,
+                    status,
+                    receipt: entry.receipt,
+                    date: entry.date,
+                    timestamp: entry.timestamp,
+                    entries: [...existingEntries, entry],
+                    balance,
+                    credit,
+                    arrearsAdded: balance,
+                    lastAmount: paidAmount,
+                    isSharedFamilyPayment: members.length > 1,
+                    groupId: members[0].groupId
                 };
 
                 const batch = db.batch();
                 members.forEach(m => {
-                    batch.update(db.collection('students').doc(m.id), { [`payments.${month}`]: paymentData, pendingArrears: newArrears });
+                    const nextArrears = Math.max(0, parseInt(m.pendingArrears || 0) + arrearsDelta);
+                    batch.update(db.collection('students').doc(m.id), { [`payments.${month}`]: paymentData, pendingArrears: nextArrears });
                 });
                 await batch.commit();
                 onClose();
             };
 
             const handleDelete = async () => {
-                const arrearsToRevert = existingPayment?.arrearsAdded || 0;
+                const arrearsToRevert = existingPayment?.balance ?? existingPayment?.arrearsAdded ?? 0;
                 const batch = db.batch();
                 members.forEach(m => {
                     batch.update(db.collection('students').doc(m.id), { [`payments.${month}`]: firebase.firestore.FieldValue.delete(), pendingArrears: firebase.firestore.FieldValue.increment(arrearsToRevert) });
@@ -930,16 +951,22 @@ const { useState, useEffect, useMemo, useRef } = React;
                             <div className="bg-gray-50 p-3 rounded border text-sm text-gray-700 mb-4">
                                 <p className="font-bold border-b pb-1 mb-2">Paying for {members.length} Student(s):</p>
                                 <div className="space-y-1 mb-2 max-h-20 overflow-y-auto">{members.map(m => <div key={m.id} className="text-xs font-bold">• {m.name}</div>)}</div>
-                                <p className="text-lg font-bold text-green-800 mt-2 border-t pt-2 flex justify-between"><span>Due Amount:</span> <span>₹{groupFee}</span></p>
+                                <div className="text-sm font-bold text-green-900 mt-2 border-t pt-2 space-y-1">
+                                    <p className="flex justify-between"><span>Due Amount:</span> <span>₹{groupFee}</span></p>
+                                    <p className="flex justify-between"><span>Already Paid:</span> <span>₹{previousPaid}</span></p>
+                                    <p className="flex justify-between text-red-700"><span>Balance:</span> <span>₹{previousBalance}</span></p>
+                                    {previousCredit > 0 && <p className="flex justify-between text-blue-700"><span>Advance/Credit:</span> <span>₹{previousCredit}</span></p>}
+                                </div>
                             </div>
+                            {existingEntries.length > 0 && <div className="border rounded max-h-28 overflow-y-auto text-xs"><div className="bg-gray-100 px-2 py-1 font-black">Payment Entries</div>{existingEntries.map((entry, i) => <div key={`${entry.timestamp}_${i}`} className="flex justify-between px-2 py-1 border-t"><span>{entry.date || '-'} • {entry.receipt || 'N/A'}</span><span className="font-bold">₹{entry.amount || 0}</span></div>)}</div>}
                             
                             <div><label className="block text-sm font-bold text-gray-700 mb-1">Date of Payment</label><input type="date" required className="w-full px-4 py-2 border rounded-md font-bold text-gray-800 outline-none focus:ring-2 focus:ring-green-500" value={payDate} onChange={e => setPayDate(e.target.value)} /></div>
-                            <div><label className="block text-sm font-bold text-gray-700 mb-1">Amount Paid (₹)</label><input type="number" required min="1" className="w-full px-4 py-3 border rounded-md text-2xl font-bold outline-none focus:ring-2 focus:ring-green-500" value={amount} onChange={e => setAmount(e.target.value)} /></div>
+                            <div><label className="block text-sm font-bold text-gray-700 mb-1">New Amount Paid (₹)</label><input type="number" required min="1" className="w-full px-4 py-3 border rounded-md text-2xl font-bold outline-none focus:ring-2 focus:ring-green-500" value={amount} onChange={e => setAmount(e.target.value)} /></div>
                             <div><label className="block text-sm font-bold text-gray-700 mb-1">Receipt No (Optional)</label><input type="text" className="w-full px-4 py-2 border rounded-md uppercase font-bold outline-none focus:ring-2 focus:ring-green-500" value={receipt} onChange={e => setReceipt(e.target.value)} /></div>
                             
                             <div className="pt-4 flex justify-between mt-6">
                                 {existingPayment ? <button type="button" onClick={() => setConfirmDel(true)} className="text-red-600 font-bold px-3 py-2 border border-transparent hover:border-red-200 rounded">Delete Record</button> : <div></div>}
-                                <div className="space-x-3"><button type="button" onClick={onClose} className="px-4 py-2 font-bold text-gray-600 border rounded hover:bg-gray-50">Cancel</button><button type="submit" className="px-6 py-2 bg-green-600 text-white rounded-md font-bold shadow-md hover:bg-green-700">Save</button></div>
+                                <div className="space-x-3"><button type="button" onClick={onClose} className="px-4 py-2 font-bold text-gray-600 border rounded hover:bg-gray-50">Cancel</button><button type="submit" className="px-6 py-2 bg-green-600 text-white rounded-md font-bold shadow-md hover:bg-green-700">Add Entry</button></div>
                             </div>
                         </form>
                     </div>
