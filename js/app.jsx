@@ -364,10 +364,24 @@ const { useState, useEffect, useMemo, useRef } = React;
                 setMultiPaymentModalOpen(true);
             };
             const clearMultiSelection = () => setSelectedMonthPayments([]);
-            const downloadTablePdf = () => {
+            const loadImageAsDataUrl = (src) => new Promise((resolve, reject) => {
+                const image = new Image();
+                image.crossOrigin = 'anonymous';
+                image.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = image.naturalWidth;
+                    canvas.height = image.naturalHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(image, 0, 0);
+                    resolve(canvas.toDataURL('image/png'));
+                };
+                image.onerror = reject;
+                image.src = src;
+            });
+            const downloadTablePdf = async () => {
                 if (!window.jspdf?.jsPDF) return showAlert('PDF preview library is still loading. Please try again.', 'PDF Preview');
                 const doc = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
-                const title = `${settings.institutionName || 'Madrasa Fee Manager'} - Fee Table`;
+                const title = `${settings.institutionName || 'Madrasa Fee Manager'}`;
                 const subtitle = `${settings.institutionPlace || ''} ${settings.registerNumber ? `• Reg: ${settings.registerNumber}` : ''}`.trim();
                 const preparedRows = visibleStudentRows.map((student, idx) => {
                     const groupMembers = student.displayMembers || getGroupMembers(student.groupId);
@@ -384,7 +398,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                         if (!payment) return '---';
                         const balance = payment.balance ?? payment.arrearsAdded ?? 0;
                         const credit = payment.credit || 0;
-                        return [payment.receipt || String(payment.amount || 0), balance > 0 ? `Bal: ${balance}` : '', credit > 0 ? `Credit: ${credit}` : ''].filter(Boolean).join('\n');
+                        return [payment.receipt || String(payment.amount || 0), balance > 0 ? `Bal: ${balance}` : '', credit > 0 ? `Cr: ${credit}` : ''].filter(Boolean).join('\n');
                     });
                     return { idx: idx + 1, classText, nameText, guardian: student.guardian || '-', phone: student.phone || '-', groupFee, totalExFee, dueExFee, arrears, monthValues };
                 });
@@ -404,19 +418,32 @@ const { useState, useEffect, useMemo, useRef } = React;
                     return [...cells, ...row.monthValues];
                 });
 
+                const pageWidth = doc.internal.pageSize.getWidth();
                 doc.setFontSize(14);
-                doc.text(title, 40, 30);
-                if (subtitle) { doc.setFontSize(9); doc.text(subtitle, 40, 46); }
+                doc.text(title, pageWidth / 2, 30, { align: 'center' });
+                if (subtitle) { doc.setFontSize(9); doc.text(subtitle, pageWidth / 2, 46, { align: 'center' }); }
+                if (settings.logo) {
+                    try {
+                        const logoData = await loadImageAsDataUrl(settings.logo);
+                        doc.addImage(logoData, 'PNG', pageWidth - 70, 16, 42, 42);
+                    } catch (err) {
+                        console.warn('Unable to add logo to PDF', err);
+                    }
+                }
                 const firstMonthColumn = columns.length - dynamicMonths.length;
+                const pdfColumnStyles = { 0: { cellWidth: 24, halign: 'center' }, 1: { cellWidth: 34, halign: 'center' }, 2: { cellWidth: 90 }, 3: { cellWidth: 70 }, 4: { cellWidth: 55, halign: 'center' }, 5: { cellWidth: 42, halign: 'center' } };
+                columns.forEach((_, columnIndex) => {
+                    if (columnIndex >= firstMonthColumn) pdfColumnStyles[columnIndex] = { cellWidth: 32, halign: 'center' };
+                });
                 doc.autoTable({
                     head: [columns],
                     body: rows,
-                    startY: subtitle ? 58 : 48,
+                    startY: 70,
                     theme: 'grid',
                     styles: { fontSize: 6, cellPadding: 2, overflow: 'linebreak', valign: 'top', lineColor: [75, 85, 99], lineWidth: 0.35 },
                     headStyles: { fillColor: [0, 0, 0], textColor: 255, fontStyle: 'bold', lineColor: [0, 0, 0], lineWidth: 0.5 },
                     alternateRowStyles: { fillColor: [255, 255, 255] },
-                    columnStyles: { 0: { cellWidth: 24, halign: 'center' }, 1: { cellWidth: 34, halign: 'center' }, 2: { cellWidth: 90 }, 3: { cellWidth: 70 }, 4: { cellWidth: 55, halign: 'center' }, 5: { cellWidth: 42, halign: 'center' }, 6: { cellWidth: 42 }, 7: { cellWidth: 42 }, 8: { cellWidth: 38 } },
+                    columnStyles: pdfColumnStyles,
                     margin: { left: 18, right: 18 },
                     didParseCell: (data) => {
                         if (data.column.index === 0 || data.column.index === 1 || data.column.index === 4 || data.column.index === 5 || data.column.index >= firstMonthColumn) {
