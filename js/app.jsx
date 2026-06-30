@@ -1165,13 +1165,25 @@ const { useState, useEffect, useMemo, useRef } = React;
                                         <span>3. Link Siblings (Manual)</span><span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full self-start sm:self-auto">{members.length} Selected</span>
                                     </h4>
 
+                                    <div className="mb-3 rounded border border-yellow-200 bg-yellow-50 p-2">
+                                        <div className="mb-2 text-[11px] font-black uppercase tracking-wide text-yellow-900">Saved / Selected Students</div>
+                                        <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                                            {members.map(m => (
+                                                <div key={m.id} className={`flex justify-between items-center gap-2 p-2 rounded border ${m.id === primaryStudent.id ? 'bg-white border-yellow-400' : 'bg-gray-50 border-gray-200'}`}>
+                                                    <div className="min-w-0"><span className="font-bold text-sm text-gray-800 break-words">{m.name}</span> <span className="text-[10px] text-gray-600 font-medium bg-gray-200 px-1.5 py-0.5 rounded ml-1 whitespace-nowrap">Cls {m.studentClass}</span></div>
+                                                    {m.id !== primaryStudent.id && <button type="button" onClick={() => removeMember(m.id)} className="text-red-500 hover:text-red-700 p-1 shrink-0"><Icons.Close /></button>}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
                                     <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-2 mb-3 bg-blue-50 p-2 rounded border border-blue-100">
                                         <select className="p-2 border rounded text-xs w-full outline-none" value={searchClass} onChange={e => setSearchClass(e.target.value)}><option value="">Class</option>{CLASSES.map(c => <option key={c} value={c}>{c}</option>)}</select>
                                         <input type="text" placeholder="Search to add..." className="p-2 border rounded text-xs w-full outline-none" value={searchName} onChange={e => setSearchName(e.target.value)} />
                                     </div>
 
                                     {searchName && searchClass && (
-                                        <div className="mb-3 border border-green-200 rounded max-h-24 overflow-y-auto bg-green-50 shadow-inner">
+                                        <div className="border border-green-200 rounded max-h-40 overflow-y-auto bg-green-50 shadow-inner">
                                             {searchResults.length === 0 ? <div className="p-2 text-xs text-gray-500 text-center">No unlinked matches found.</div> :
                                                 searchResults.map(s => (
                                                     <div key={s.id} className="flex justify-between items-center gap-2 p-2 border-b hover:bg-green-100">
@@ -1182,15 +1194,6 @@ const { useState, useEffect, useMemo, useRef } = React;
                                             }
                                         </div>
                                     )}
-
-                                    <div className="space-y-2 overflow-y-auto flex-1 pr-1 min-h-[140px]">
-                                        {members.map(m => (
-                                            <div key={m.id} className={`flex justify-between items-center gap-2 p-2 rounded border ${m.id === primaryStudent.id ? 'bg-yellow-50 border-yellow-400' : 'bg-gray-50 border-gray-200'}`}>
-                                                <div className="min-w-0"><span className="font-bold text-sm text-gray-800 break-words">{m.name}</span> <span className="text-[10px] text-gray-600 font-medium bg-gray-200 px-1.5 py-0.5 rounded ml-1 whitespace-nowrap">Cls {m.studentClass}</span></div>
-                                                {m.id !== primaryStudent.id && <button type="button" onClick={() => removeMember(m.id)} className="text-red-500 hover:text-red-700 p-1 shrink-0"><Icons.Close /></button>}
-                                            </div>
-                                        ))}
-                                    </div>
                                 </div>
                             </div>
                         </div>
