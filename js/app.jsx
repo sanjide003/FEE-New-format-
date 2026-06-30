@@ -220,19 +220,40 @@ const { useState, useEffect, useMemo, useRef } = React;
             </div>;
         };
 
+        const historySortDate = (payment) => {
+            const raw = payment?.timestamp || payment?.date || '';
+            const parsed = raw ? new Date(raw) : null;
+            return parsed && !Number.isNaN(parsed.getTime()) ? parsed.getTime() : 0;
+        };
+        const formatHistoryDate = (payment) => {
+            const raw = payment?.date || payment?.timestamp?.slice(0, 10) || '';
+            if (!raw) return '-';
+            const parts = raw.split('-');
+            if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+            const parsed = new Date(raw);
+            return Number.isNaN(parsed.getTime()) ? raw : parsed.toLocaleDateString('en-GB');
+        };
         const buildFeeHistoryRows = (students, settings, dynamicMonths) => {
             const rows = [];
+            const seenMonthlyGroups = new Set();
             students.forEach(student => {
                 dynamicMonths.forEach(month => {
                     const payment = student.payments?.[month];
-                    if (payment) rows.push({ id: `${student.id}_${month}`, studentId: student.id, kind: 'MONTH', key: month, date: payment.date || payment.timestamp?.slice(0, 10) || '-', receipt: payment.receipt || '-', studentName: student.name, studentClass: student.studentClass, type: `Monthly Fee - ${month}`, amount: parseInt(payment.lastAmount || payment.amount || 0), status: payment.status || 'PAID', payment });
+                    if (payment) {
+                        const historyKey = payment.isSharedFamilyPayment && payment.groupId ? `${payment.groupId}_${month}` : `${student.id}_${month}`;
+                        if (seenMonthlyGroups.has(historyKey)) return;
+                        seenMonthlyGroups.add(historyKey);
+                        const groupMembers = payment.groupId ? students.filter(s => s.groupId === payment.groupId) : [student];
+                        const names = (payment.isSharedFamilyPayment && groupMembers.length) ? groupMembers.map(member => member.name).join(', ') : student.name;
+                        rows.push({ id: historyKey, studentId: student.id, kind: 'MONTH', key: month, date: formatHistoryDate(payment), sortDate: historySortDate(payment), receipt: payment.receipt || '-', studentName: names, studentClass: student.studentClass, type: `Monthly Fee - ${month}`, amount: parseInt(payment.lastAmount || payment.amount || 0), status: payment.status || 'PAID', payment });
+                    }
                 });
                 (settings.extraFees || []).forEach(fee => {
                     const payment = student.extraFeePayments?.[fee.id];
-                    if (payment) rows.push({ id: `${student.id}_${fee.id}`, studentId: student.id, kind: 'EXTRA', key: fee.id, date: payment.date || payment.timestamp?.slice(0, 10) || '-', receipt: payment.receipt || '-', studentName: student.name, studentClass: student.studentClass, type: fee.name || 'Extra Fee', amount: parseInt(payment.amount || 0), status: payment.balance > 0 ? 'PARTIAL' : 'PAID', payment });
+                    if (payment) rows.push({ id: `${student.id}_${fee.id}`, studentId: student.id, kind: 'EXTRA', key: fee.id, date: formatHistoryDate(payment), sortDate: historySortDate(payment), receipt: payment.receipt || '-', studentName: student.name, studentClass: student.studentClass, type: fee.name || 'Extra Fee', amount: parseInt(payment.amount || 0), status: payment.balance > 0 ? 'PARTIAL' : 'PAID', payment });
                 });
             });
-            return rows.sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.receipt).localeCompare(String(a.receipt)));
+            return rows.sort((a, b) => (b.sortDate || 0) - (a.sortDate || 0) || String(b.receipt).localeCompare(String(a.receipt)));
         };
 
         const nextReceiptNumber = (value) => {
@@ -905,8 +926,8 @@ const { useState, useEffect, useMemo, useRef } = React;
 
                     {importPreview && <ImportPreviewModal preview={importPreview} onCancel={() => setImportPreview(null)} onConfirm={confirmImport} importing={uploading} />}
                     {familyModalOpen && <FamilySetupModal primaryStudent={selectedFamilyStudent} allStudents={students} globalBaseFee={settings.globalBaseFee} groupOnly={groupOnlyMode} onClose={() => setFamilyModalOpen(false)} showAlert={showAlert}/>}
-                    {paymentModalOpen && <GroupPaymentModal context={paymentGroupData} onClose={() => setPaymentModalOpen(false)} showAlert={showAlert}/>}
-                    {multiPaymentModalOpen && <MultiPaymentModal selectedItems={selectedMonthPayments} onClose={() => setMultiPaymentModalOpen(false)} onSaved={() => { setMultiPaymentModalOpen(false); clearMultiSelection(); }} showAlert={showAlert}/>}
+                    {paymentModalOpen && <GroupPaymentModal context={paymentGroupData} settings={settings} onClose={() => setPaymentModalOpen(false)} showAlert={showAlert}/>}
+                    {multiPaymentModalOpen && <MultiPaymentModal selectedItems={selectedMonthPayments} settings={settings} onClose={() => setMultiPaymentModalOpen(false)} onSaved={() => { setMultiPaymentModalOpen(false); clearMultiSelection(); }} showAlert={showAlert}/>}
                     {extraFeeModalOpen && <ExtraFeeModal student={extraFeeStudentData} settings={settings} onClose={() => setExtraFeeModalOpen(false)} showAlert={showAlert}/>}
                     {profileModalOpen && <StudentProfileModal student={selectedProfile} onClose={() => setProfileModalOpen(false)} onEdit={() => openFullStudentEditor(selectedProfile)} showAlert={showAlert} />}
                 </div>
@@ -1202,8 +1223,8 @@ const { useState, useEffect, useMemo, useRef } = React;
         };
 
         // --- MULTI MONTH PAYMENT MODAL ---
-        const MultiPaymentModal = ({ selectedItems, onClose, onSaved, showAlert }) => {
-            const [receipt, setReceipt] = useState('');
+        const MultiPaymentModal = ({ selectedItems, settings, onClose, onSaved, showAlert }) => {
+            const [receipt, setReceipt] = useState(settings.receiptRequired === false ? '' : (settings.lastReceiptNumber || nextReceiptNumber('')));
             const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
             const [amount, setAmount] = useState(selectedItems.reduce((sum, item) => sum + parseInt(item.groupFee || 0), 0));
             const totalDue = selectedItems.reduce((sum, item) => sum + parseInt(item.groupFee || 0), 0);
@@ -1216,9 +1237,10 @@ const { useState, useEffect, useMemo, useRef } = React;
             const handleSave = async (e) => {
                 e.preventDefault();
                 const paidAmount = parseInt(amount);
-                if (!receipt.trim()) return showAlert('Receipt number is required for multi-entry payment.', 'Missing Receipt');
+                if (settings.receiptRequired !== false && !receipt.trim()) return showAlert('Receipt number is required for multi-entry payment.', 'Missing Receipt');
                 if (isNaN(paidAmount) || paidAmount <= 0) return showAlert('Valid amount is required.', 'Invalid Amount');
                 if (paidAmount > totalDue) return showAlert(`Amount cannot be greater than selected total ₹${totalDue}.`, 'Over Payment Not Allowed');
+                const cleanReceipt = receipt.trim().toUpperCase();
                 const batchId = 'BATCH_' + Date.now();
                 let remaining = paidAmount;
                 const batch = db.batch();
@@ -1231,7 +1253,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                     const paymentData = {
                         amount: applied,
                         status: arrearsAdded > 0 ? 'PARTIAL' : 'FULL',
-                        receipt: receipt.trim().toUpperCase(),
+                        receipt: cleanReceipt,
                         date: payDate,
                         timestamp: new Date().toISOString(),
                         arrearsAdded,
@@ -1248,6 +1270,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                         });
                     });
                 });
+                if (cleanReceipt && settings.receiptRequired !== false) batch.set(db.collection('settings').doc('global'), { lastReceiptNumber: nextReceiptNumber(cleanReceipt) }, { merge: true });
                 await batch.commit();
                 onSaved();
             };
@@ -1263,7 +1286,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                             <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex justify-between font-black text-green-900"><span>Total Selected</span><span>₹{totalDue}</span></div>
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                 <div><label className="block text-xs font-bold text-gray-500 mb-1">Date</label><input type="date" required className="w-full border rounded p-2 font-bold" value={payDate} onChange={e => setPayDate(e.target.value)} /></div>
-                                <div><label className="block text-xs font-bold text-gray-500 mb-1">Receipt No</label><input type="text" required className="w-full border rounded p-2 font-bold uppercase" value={receipt} onChange={e => setReceipt(e.target.value)} /></div>
+                                <div><label className="block text-xs font-bold text-gray-500 mb-1">Receipt No {settings.receiptRequired !== false && <span className="text-red-500">*</span>}</label><input type="text" required={settings.receiptRequired !== false} className="w-full border rounded p-2 font-bold uppercase" value={receipt} onChange={e => setReceipt(e.target.value)} /></div>
                                 <div><label className="block text-xs font-bold text-gray-500 mb-1">Amount Paid</label><input type="number" required min="1" className="w-full border rounded p-2 font-black" value={amount} onChange={e => setAmount(e.target.value)} /></div>
                             </div>
                             <div className="flex justify-end gap-2 pt-3 border-t"><button type="button" onClick={onClose} className="px-4 py-2 border rounded font-bold">Cancel</button><button type="submit" className="px-6 py-2 bg-green-700 text-white rounded font-bold shadow">Save Entry</button></div>
@@ -1274,7 +1297,7 @@ const { useState, useEffect, useMemo, useRef } = React;
         };
 
         // --- GROUP PAYMENT MODAL (ledger style entries) ---
-        const GroupPaymentModal = ({ context, onClose, showAlert }) => {
+        const GroupPaymentModal = ({ context, settings, onClose, showAlert }) => {
             const { members, month, groupFee, existingPayment } = context;
             const previousPaid = parseInt(existingPayment?.amount || 0);
             const previousBalance = Math.max(0, groupFee - previousPaid);
@@ -1285,7 +1308,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                 timestamp: existingPayment.timestamp || ''
             }] : []);
             const [amount, setAmount] = useState(existingPayment ? (previousBalance || '') : groupFee);
-            const [receipt, setReceipt] = useState('');
+            const [receipt, setReceipt] = useState(settings.receiptRequired === false ? '' : (settings.lastReceiptNumber || nextReceiptNumber('')));
             const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
             const [confirmDel, setConfirmDel] = useState(false);
 
@@ -1293,9 +1316,11 @@ const { useState, useEffect, useMemo, useRef } = React;
                 e.preventDefault();
                 const paidAmount = parseInt(amount);
                 if (isNaN(paidAmount) || paidAmount <= 0) return showAlert("Valid amount is required", "Invalid Amount");
+                if (settings.receiptRequired !== false && !receipt.trim()) return showAlert("Receipt number is required", "Missing Receipt");
                 if (paidAmount > previousBalance) return showAlert(`Amount cannot be greater than balance ₹${previousBalance}.`, "Over Payment Not Allowed");
 
-                const entry = { amount: paidAmount, receipt: receipt.trim().toUpperCase(), date: payDate, timestamp: new Date().toISOString() };
+                const cleanReceipt = receipt.trim().toUpperCase();
+                const entry = { amount: paidAmount, receipt: cleanReceipt, date: payDate, timestamp: new Date().toISOString() };
                 const totalPaid = previousPaid + paidAmount;
                 const balance = Math.max(0, groupFee - totalPaid);
                 const credit = 0;
@@ -1323,6 +1348,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                     const nextArrears = Math.max(0, parseInt(m.pendingArrears || 0) + arrearsDelta);
                     batch.update(db.collection('students').doc(m.id), { [`payments.${month}`]: paymentData, pendingArrears: nextArrears });
                 });
+                if (cleanReceipt && settings.receiptRequired !== false) batch.set(db.collection('settings').doc('global'), { lastReceiptNumber: nextReceiptNumber(cleanReceipt) }, { merge: true });
                 await batch.commit();
                 onClose();
             };
@@ -1356,7 +1382,7 @@ const { useState, useEffect, useMemo, useRef } = React;
 
                             <div><label className="block text-sm font-bold text-gray-700 mb-1">Date of Payment</label><input type="date" required className="w-full px-4 py-2 border rounded-md font-bold text-gray-800 outline-none focus:ring-2 focus:ring-green-500" value={payDate} onChange={e => setPayDate(e.target.value)} /></div>
                             <div><label className="block text-sm font-bold text-gray-700 mb-1">New Amount Paid (₹)</label><input type="number" required min="1" className="w-full px-4 py-3 border rounded-md text-2xl font-bold outline-none focus:ring-2 focus:ring-green-500" value={amount} onChange={e => setAmount(e.target.value)} /></div>
-                            <div><label className="block text-sm font-bold text-gray-700 mb-1">Receipt No (Optional)</label><input type="text" className="w-full px-4 py-2 border rounded-md uppercase font-bold outline-none focus:ring-2 focus:ring-green-500" value={receipt} onChange={e => setReceipt(e.target.value)} /></div>
+                            <div><label className="block text-sm font-bold text-gray-700 mb-1">Receipt No {settings.receiptRequired !== false ? <span className="text-red-500">*</span> : <span className="text-gray-400">(Optional)</span>}</label><input type="text" required={settings.receiptRequired !== false} className="w-full px-4 py-2 border rounded-md uppercase font-bold outline-none focus:ring-2 focus:ring-green-500" value={receipt} onChange={e => setReceipt(e.target.value)} /></div>
 
                             <div className="pt-4 flex justify-between mt-6">
                                 {existingPayment ? <button type="button" onClick={() => setConfirmDel(true)} className="text-red-600 font-bold px-3 py-2 border border-transparent hover:border-red-200 rounded">Delete Record</button> : <div></div>}
@@ -1374,7 +1400,7 @@ const { useState, useEffect, useMemo, useRef } = React;
             if (!student) return null;
             const applicableFees = settings.extraFees?.filter(f => feeAppliesToStudent(f, student.studentClass)) || [];
             const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
-            const [receipt, setReceipt] = useState('');
+            const [receipt, setReceipt] = useState(settings.receiptRequired === false ? '' : (settings.lastReceiptNumber || nextReceiptNumber('')));
             const [activeFeeId, setActiveFeeId] = useState(null);
             const [amountInput, setAmountInput] = useState('');
             const [entryMode, setEntryMode] = useState('PAY');
@@ -1391,11 +1417,11 @@ const { useState, useEffect, useMemo, useRef } = React;
                 setActiveFeeId(fee.id);
                 setEntryMode(mode);
                 setPayDate(payment?.date || new Date().toISOString().split('T')[0]);
-                setReceipt(payment?.receipt || '');
+                setReceipt(payment?.receipt || (settings.receiptRequired === false ? '' : (settings.lastReceiptNumber || nextReceiptNumber(''))));
                 setAmountInput(mode === 'EDIT' ? paid : (balance || expected));
             };
 
-            const cancelEntry = () => { setActiveFeeId(null); setReceipt(''); setAmountInput(''); setEntryMode('PAY'); setPayDate(new Date().toISOString().split('T')[0]); };
+            const cancelEntry = () => { setActiveFeeId(null); setReceipt(settings.receiptRequired === false ? '' : (settings.lastReceiptNumber || nextReceiptNumber(''))); setAmountInput(''); setEntryMode('PAY'); setPayDate(new Date().toISOString().split('T')[0]); };
 
             const savePayment = async (fee) => {
                 const expected = feeAmountForStudent(fee, student.studentClass);
@@ -1403,10 +1429,15 @@ const { useState, useEffect, useMemo, useRef } = React;
                 const existingPaid = parseInt(existing?.amount || 0);
                 const inputAmount = parseInt(amountInput || 0);
                 if (isNaN(inputAmount) || inputAmount <= 0) return showAlert('Enter a valid amount.', 'Invalid Amount');
+                if (settings.receiptRequired !== false && !receipt.trim()) return showAlert('Receipt number is required.', 'Missing Receipt');
                 const finalAmount = entryMode === 'EDIT' ? inputAmount : existingPaid + inputAmount;
                 if (finalAmount > expected) return showAlert(`Amount cannot exceed total fee ₹${expected}.`, 'Invalid Amount');
-                const paymentObj = { amount: finalAmount, date: payDate, receipt: receipt.trim().toUpperCase(), timestamp: new Date().toISOString(), total: expected, balance: Math.max(0, expected - finalAmount) };
-                await db.collection('students').doc(student.id).update({ [`extraFeePayments.${fee.id}`]: paymentObj });
+                const cleanReceipt = receipt.trim().toUpperCase();
+                const paymentObj = { amount: finalAmount, date: payDate, receipt: cleanReceipt, timestamp: new Date().toISOString(), total: expected, balance: Math.max(0, expected - finalAmount) };
+                const batch = db.batch();
+                batch.update(db.collection('students').doc(student.id), { [`extraFeePayments.${fee.id}`]: paymentObj });
+                if (cleanReceipt && settings.receiptRequired !== false) batch.set(db.collection('settings').doc('global'), { lastReceiptNumber: nextReceiptNumber(cleanReceipt) }, { merge: true });
+                await batch.commit();
                 cancelEntry();
             };
 
@@ -1451,7 +1482,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                             <div className="font-bold text-sm text-purple-900">{entryMode === 'EDIT' ? 'Edit Payment' : entryMode === 'UPDATE' ? 'Pay Pending Balance' : 'New Payment'} - {fee.name}</div>
                                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
                                                 <div><label className="text-xs font-bold text-gray-500">Date</label><input type="date" className="w-full border p-2 rounded" value={payDate} onChange={e => setPayDate(e.target.value)} /></div>
-                                                <div><label className="text-xs font-bold text-gray-500">Receipt No</label><input type="text" className="w-full border p-2 rounded uppercase" value={receipt} onChange={e => setReceipt(e.target.value)} /></div>
+                                                <div><label className="text-xs font-bold text-gray-500">Receipt No {settings.receiptRequired !== false && <span className="text-red-500">*</span>}</label><input type="text" required={settings.receiptRequired !== false} className="w-full border p-2 rounded uppercase" value={receipt} onChange={e => setReceipt(e.target.value)} /></div>
                                                 <div><label className="text-xs font-bold text-gray-500">Amount</label><input type="number" className="w-full border p-2 rounded font-bold" value={amountInput} onChange={e => setAmountInput(e.target.value)} /></div>
                                             </div>
                                             <div className="flex justify-end space-x-2 pt-2 border-t"><button onClick={cancelEntry} className="px-3 py-1.5 bg-gray-200 rounded text-xs font-bold">Cancel</button><button onClick={() => savePayment(fee)} className="px-4 py-1.5 bg-purple-600 text-white rounded text-xs font-bold shadow">Save</button></div>
