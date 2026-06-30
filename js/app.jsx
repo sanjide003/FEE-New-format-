@@ -74,7 +74,8 @@ const { useState, useEffect, useMemo, useRef } = React;
                 logo: '',
                 extraFees: [],
                 receiptRequired: true,
-                lastReceiptNumber: ''
+                lastReceiptNumber: '',
+                headerColor: '#15803d'
             });
             const [loading, setLoading] = useState(true);
             const [error, setError] = useState(null);
@@ -87,8 +88,8 @@ const { useState, useEffect, useMemo, useRef } = React;
                 const unsubSettings = db.collection('settings').doc('global').onSnapshot(doc => {
                     if (doc.exists) {
                         const data = doc.data();
-                        if (data.receiptRequired === undefined || data.lastReceiptNumber === undefined) {
-                            db.collection('settings').doc('global').set({ receiptRequired: data.receiptRequired !== false, lastReceiptNumber: data.lastReceiptNumber || '' }, { merge: true });
+                        if (data.receiptRequired === undefined || data.lastReceiptNumber === undefined || data.headerColor === undefined) {
+                            db.collection('settings').doc('global').set({ receiptRequired: data.receiptRequired !== false, lastReceiptNumber: data.lastReceiptNumber || '', headerColor: data.headerColor || '#15803d' }, { merge: true });
                         }
                         setSettings({
                             globalBaseFee: data.globalBaseFee || 500,
@@ -100,10 +101,11 @@ const { useState, useEffect, useMemo, useRef } = React;
                             logo: data.logo || '',
                             extraFees: data.extraFees || [],
                             receiptRequired: data.receiptRequired !== false,
-                            lastReceiptNumber: data.lastReceiptNumber || ''
+                            lastReceiptNumber: data.lastReceiptNumber || '',
+                            headerColor: data.headerColor || '#15803d'
                         });
                     } else {
-                        db.collection('settings').doc('global').set({ globalBaseFee: 500, academicStartMonth: 'Jun', academicEndMonth: 'May', institutionName: 'Madrasa Fee Manager', institutionPlace: '', registerNumber: '', logo: '', extraFees: [], receiptRequired: true, lastReceiptNumber: '' });
+                        db.collection('settings').doc('global').set({ globalBaseFee: 500, academicStartMonth: 'Jun', academicEndMonth: 'May', institutionName: 'Madrasa Fee Manager', institutionPlace: '', registerNumber: '', logo: '', extraFees: [], receiptRequired: true, lastReceiptNumber: '', headerColor: '#15803d' });
                     }
                 }, err => setError("Database Rules Error."));
 
@@ -132,9 +134,9 @@ const { useState, useEffect, useMemo, useRef } = React;
 
             return (
                 <div className="min-h-screen flex flex-col bg-gray-50">
-                    <header className="app-header bg-green-700 text-white shadow-md relative">
+                    <header className="app-header text-white shadow-md relative" style={{ backgroundColor: settings.headerColor || '#15803d' }}>
                         <div className="max-w-full px-4 sm:px-6 lg:px-8 py-4 grid grid-cols-[auto_1fr_auto] items-center gap-3">
-                            <button onClick={() => setMenuOpen(!menuOpen)} className="p-2 rounded-lg bg-green-800 hover:bg-green-900"><Icons.Menu /></button>
+                            <button onClick={() => setMenuOpen(!menuOpen)} className="p-2 rounded-lg bg-black/20 hover:bg-black/30"><Icons.Menu /></button>
                             <div className="text-center min-w-0">
                                 <h1 className="text-2xl font-bold truncate">{settings.institutionName || 'Madrasa Fee Manager'}</h1>
                                 <p className="text-xs text-green-100 truncate">{settings.institutionPlace || 'Fee Management System'} {settings.registerNumber ? `• Reg: ${settings.registerNumber}` : ''}</p>
@@ -142,14 +144,14 @@ const { useState, useEffect, useMemo, useRef } = React;
                             {settings.logo ? <img src={settings.logo} className="w-12 h-12 rounded-full bg-white object-cover border-2 border-white justify-self-end" /> : <div className="w-12 h-12 rounded-full bg-green-900 flex items-center justify-center font-black justify-self-end">MF</div>}
                         </div>
                         {menuOpen && <div className="absolute left-4 top-20 z-50 w-72 rounded-xl bg-white text-gray-800 shadow-2xl border overflow-hidden">
-                            {[['DASHBOARD','Dashboard',<Icons.Dashboard />],['FEE_ENTRY','Fee Entry',<Icons.PlusCircle />],['FEE_HISTORY','Fee History',<Icons.Check />],['STUDENTS','Student Management',<Icons.Users />],['CLASSES','Class Management',<Icons.Users />],['SETTINGS','Settings',<Icons.Settings />]].map(([key,label,icon]) => <button key={key} onClick={() => { setActiveTab(key); setMenuOpen(false); }} className={`w-full flex items-center px-5 py-4 font-bold hover:bg-green-50 ${activeTab === key ? 'bg-green-100 text-green-800' : ''}`}>{icon}{label}</button>)}
+                            {[['DASHBOARD','Dashboard',<Icons.Dashboard />],['STUDENTS','Student Management',<Icons.Users />],['FEE_ENTRY','Fee Entry',<Icons.PlusCircle />],['FEE_HISTORY','Fee History',<Icons.Check />],['CLASSES','Class Management',<Icons.Users />],['SETTINGS','Settings',<Icons.Settings />]].map(([key,label,icon]) => <button key={key} onClick={() => { setActiveTab(key); setMenuOpen(false); }} className={`w-full flex items-center px-5 py-4 font-bold hover:bg-green-50 ${activeTab === key ? 'bg-green-100 text-green-800' : ''}`}>{icon}{label}</button>)}
                         </div>}
                     </header>
                     <main className="flex-1 max-w-full w-full mx-auto p-4 sm:p-6 lg:p-8 bg-white shadow-inner">
                         {activeTab === 'DASHBOARD' && <DashboardTab students={students} settings={settings} dynamicMonths={dynamicMonths} />}
+                        {activeTab === 'STUDENTS' && <StudentTab students={students} settings={settings} dynamicMonths={dynamicMonths} showAlert={showAlert} />}
                         {activeTab === 'FEE_ENTRY' && <FeeEntryTab students={students} settings={settings} dynamicMonths={dynamicMonths} showAlert={showAlert} />}
                         {activeTab === 'FEE_HISTORY' && <FeeHistoryTab students={students} settings={settings} dynamicMonths={dynamicMonths} showAlert={showAlert} />}
-                        {activeTab === 'STUDENTS' && <StudentTab students={students} settings={settings} dynamicMonths={dynamicMonths} showAlert={showAlert} />}
                         {activeTab === 'CLASSES' && <ClassManagementTab students={students} showAlert={showAlert} />}
                         {activeTab === 'SETTINGS' && <SettingsTab settings={settings} students={students} ALL_MONTHS_BASE={ALL_MONTHS_BASE} showAlert={showAlert} />}
                     </main>
@@ -270,6 +272,7 @@ const { useState, useEffect, useMemo, useRef } = React;
             const [query, setQuery] = useState('');
             const [selectedStudent, setSelectedStudent] = useState(null);
             const [selectedItems, setSelectedItems] = useState([]);
+            const [paymentScope, setPaymentScope] = useState('SINGLE');
             const [receipt, setReceipt] = useState(() => settings.receiptRequired === false ? '' : (settings.lastReceiptNumber || nextReceiptNumber('')));
             const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
             const [description, setDescription] = useState('');
@@ -283,18 +286,25 @@ const { useState, useEffect, useMemo, useRef } = React;
                 (!query || (student.name || '').toLowerCase().includes(query.toLowerCase()) || (student.profile?.admNo || '').toLowerCase().includes(query.toLowerCase()))
             ).slice(0, 8), [students, studentClass, gender, query]);
 
+            const selectedGroupMembers = useMemo(() => selectedStudent?.groupId ? students.filter(s => s.groupId === selectedStudent.groupId) : [], [students, selectedStudent]);
+            const isGroupedStudent = selectedGroupMembers.length > 1;
+            const isGroupPayment = selectedStudent && isGroupedStudent && paymentScope === 'GROUP';
             const feeItems = useMemo(() => {
                 if (!selectedStudent) return [];
-                const monthlyAmount = selectedStudent.groupFee || settings.globalBaseFee || 0;
-                const monthly = dynamicMonths.map(month => ({ id: `MONTH_${month}`, type: 'MONTH', label: month, subtitle: 'Monthly Fee', amount: monthlyAmount, paid: !!selectedStudent.payments?.[month], paidInfo: selectedStudent.payments?.[month]?.receipt || selectedStudent.payments?.[month]?.amount || '', month }));
+                const paymentSource = isGroupPayment ? (selectedGroupMembers[0] || selectedStudent) : selectedStudent;
+                const monthlyAmount = isGroupPayment ? (paymentSource.groupFee || (selectedGroupMembers.length * (settings.globalBaseFee || 0))) : (settings.globalBaseFee || 0);
+                const monthly = dynamicMonths.map(month => ({ id: `MONTH_${month}`, type: 'MONTH', label: month, subtitle: isGroupPayment ? 'Group Monthly Fee' : 'Monthly Fee', amount: monthlyAmount, paid: !!paymentSource.payments?.[month], paidInfo: paymentSource.payments?.[month]?.receipt || paymentSource.payments?.[month]?.amount || '', month }));
                 const extras = (settings.extraFees || []).filter(fee => feeAppliesToStudent(fee, selectedStudent.studentClass)).map(fee => ({ id: `EXTRA_${fee.id}`, type: 'EXTRA', label: fee.name || 'Extra Fee', subtitle: 'Extra Fee', amount: feeAmountForStudent(fee, selectedStudent.studentClass), paid: !!selectedStudent.extraFeePayments?.[fee.id], paidInfo: selectedStudent.extraFeePayments?.[fee.id]?.receipt || selectedStudent.extraFeePayments?.[fee.id]?.amount || '', fee }));
                 return [...monthly, ...extras];
-            }, [selectedStudent, settings, dynamicMonths]);
+            }, [selectedStudent, selectedGroupMembers, isGroupPayment, settings, dynamicMonths]);
 
             const totalAmount = selectedItems.reduce((sum, itemId) => sum + (feeItems.find(item => item.id === itemId)?.amount || 0), 0);
 
-            const resetStudent = () => { setSelectedStudent(null); setQuery(''); setSelectedItems([]); };
-            const selectStudent = (student) => { setSelectedStudent(student); setQuery(`${student.name} (${student.profile?.admNo || 'No Adm'})`); setSelectedItems([]); };
+            const resetStudent = () => { setSelectedStudent(null); setQuery(''); setSelectedItems([]); setPaymentScope('SINGLE'); };
+            const selectStudent = (student) => {
+                const groupMembers = student.groupId ? students.filter(s => s.groupId === student.groupId) : [];
+                setSelectedStudent(student); setQuery(`${student.name} (${student.profile?.admNo || 'No Adm'})`); setSelectedItems([]); setPaymentScope(groupMembers.length > 1 ? 'GROUP' : 'SINGLE');
+            };
             const toggleItem = (item) => {
                 if (item.paid) return;
                 setSelectedItems(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id]);
@@ -311,10 +321,12 @@ const { useState, useEffect, useMemo, useRef } = React;
                     const nextPayments = { ...(selectedStudent.payments || {}) };
                     const nextExtraFeePayments = { ...(selectedStudent.extraFeePayments || {}) };
                     const now = new Date().toISOString();
+                    const batch = db.batch();
+                    const monthlyTargets = isGroupPayment ? selectedGroupMembers : [selectedStudent];
                     feeItems.filter(item => selectedItems.includes(item.id)).forEach(item => {
                         if (item.type === 'MONTH') {
-                            const paymentData = { amount: item.amount, lastAmount: item.amount, status: 'FULL', receipt: cleanReceipt, date: payDate, timestamp: now, entries: [{ amount: item.amount, receipt: cleanReceipt, date: payDate, timestamp: now, description }], balance: 0, credit: 0, arrearsAdded: 0, isSharedFamilyPayment: false, groupId: selectedStudent.groupId || selectedStudent.id };
-                            updates[`payments.${item.month}`] = paymentData;
+                            const paymentData = { amount: item.amount, lastAmount: item.amount, status: 'FULL', receipt: cleanReceipt, date: payDate, timestamp: now, entries: [{ amount: item.amount, receipt: cleanReceipt, date: payDate, timestamp: now, description }], balance: 0, credit: 0, arrearsAdded: 0, isSharedFamilyPayment: isGroupPayment, groupId: selectedStudent.groupId || selectedStudent.id };
+                            monthlyTargets.forEach(member => batch.update(db.collection('students').doc(member.id), { [`payments.${item.month}`]: paymentData }));
                             nextPayments[item.month] = paymentData;
                         } else {
                             const extraPaymentData = { amount: item.amount, receipt: cleanReceipt, date: payDate, timestamp: now, total: item.amount, balance: 0, description };
@@ -322,8 +334,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                             nextExtraFeePayments[item.fee.id] = extraPaymentData;
                         }
                     });
-                    const batch = db.batch();
-                    batch.update(db.collection('students').doc(selectedStudent.id), updates);
+                    if (Object.keys(updates).length) batch.update(db.collection('students').doc(selectedStudent.id), updates);
                     if (cleanReceipt && settings.receiptRequired !== false) batch.set(db.collection('settings').doc('global'), { lastReceiptNumber: nextReceiptNumber(cleanReceipt) }, { merge: true });
                     await batch.commit();
                     setSelectedStudent({ ...selectedStudent, payments: nextPayments, extraFeePayments: nextExtraFeePayments });
@@ -343,7 +354,8 @@ const { useState, useEffect, useMemo, useRef } = React;
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div><label className="text-sm font-bold text-gray-700">Class</label><select className="mt-1 w-full rounded-xl border p-3 text-lg outline-none focus:ring-2 focus:ring-green-500" value={studentClass} onChange={e => { setStudentClass(e.target.value); resetStudent(); }}><option value="">All Classes</option>{CLASSES.map(cls => <option key={cls} value={cls}>{cls}</option>)}</select></div>
                         <div><label className="text-sm font-bold text-gray-700">Gender</label><select className="mt-1 w-full rounded-xl border p-3 text-lg outline-none focus:ring-2 focus:ring-green-500" value={gender} onChange={e => { setGender(e.target.value); resetStudent(); }}><option value="ALL">All</option><option value="M">Male</option><option value="F">Female</option></select></div>
-                        <div className="md:col-span-2 relative"><label className="text-sm font-bold text-gray-700">Student</label><div className="mt-1 flex rounded-xl border bg-white overflow-hidden focus-within:ring-2 focus-within:ring-green-500"><input className="flex-1 p-3 text-lg outline-none" placeholder="Search student name or admission no..." value={query} onChange={e => { setQuery(e.target.value); setSelectedStudent(null); setSelectedItems([]); }} />{query && <button onClick={resetStudent} className="px-4 text-gray-500 hover:bg-gray-100 font-black">×</button>}</div>{query && !selectedStudent && <div className="absolute z-30 mt-1 w-full bg-white border rounded-xl shadow-lg max-h-64 overflow-y-auto">{filteredStudents.length ? filteredStudents.map(student => <button key={student.id} onClick={() => selectStudent(student)} className="w-full text-left px-4 py-3 hover:bg-green-50 border-b"><span className="font-black text-gray-800">{student.name}</span><span className="ml-2 text-xs text-gray-500">Class {student.studentClass} • Adm: {student.profile?.admNo || '-'}</span></button>) : <div className="p-4 text-sm text-gray-500">No students found.</div>}</div>}</div>
+                        <div className="md:col-span-2 relative"><label className="text-sm font-bold text-gray-700">Student</label><div className="mt-1 flex rounded-xl border bg-white overflow-hidden focus-within:ring-2 focus-within:ring-green-500"><input className="flex-1 p-3 text-lg outline-none" placeholder="Search student name or admission no..." value={query} onChange={e => { setQuery(e.target.value); setSelectedStudent(null); setSelectedItems([]); setPaymentScope('SINGLE'); }} />{query && <button onClick={resetStudent} className="px-4 text-gray-500 hover:bg-gray-100 font-black">×</button>}</div>{query && !selectedStudent && <div className="absolute z-30 mt-1 w-full bg-white border rounded-xl shadow-lg max-h-64 overflow-y-auto">{filteredStudents.length ? filteredStudents.map(student => <button key={student.id} onClick={() => selectStudent(student)} className="w-full text-left px-4 py-3 hover:bg-green-50 border-b"><span className="font-black text-gray-800">{student.name}</span><span className="ml-2 text-xs text-gray-500">Class {student.studentClass} • Adm: {student.profile?.admNo || '-'}</span></button>) : <div className="p-4 text-sm text-gray-500">No students found.</div>}</div>}</div>
+                        {selectedStudent && isGroupedStudent && <div className="md:col-span-2 rounded-xl border border-green-200 bg-green-50 p-3"><div className="mb-2 text-sm font-black text-green-900">Payment Type</div><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => { setPaymentScope('GROUP'); setSelectedItems([]); }} className={`rounded-lg border px-3 py-2 text-sm font-black ${paymentScope === 'GROUP' ? 'border-green-600 bg-green-600 text-white' : 'border-green-200 bg-white text-green-800'}`}>Group Payment</button><button type="button" onClick={() => { setPaymentScope('SINGLE'); setSelectedItems([]); }} className={`rounded-lg border px-3 py-2 text-sm font-black ${paymentScope === 'SINGLE' ? 'border-blue-600 bg-blue-600 text-white' : 'border-blue-200 bg-white text-blue-800'}`}>Single Payment</button></div><p className="mt-2 text-xs font-bold text-green-700">Default: Group Payment. Members: {selectedGroupMembers.map(member => member.name).join(', ')}</p></div>}
                         <div><label className="text-sm font-bold text-gray-700">Receipt No. {settings.receiptRequired !== false && <span className="text-red-500">*</span>}</label><input className="mt-1 w-full rounded-xl border p-3 text-lg font-black text-blue-700 outline-none focus:ring-2 focus:ring-green-500" value={receipt} onChange={e => setReceipt(e.target.value)} /></div>
                         <div><label className="text-sm font-bold text-gray-700">Date</label><input type="date" className="mt-1 w-full rounded-xl border p-3 text-lg outline-none focus:ring-2 focus:ring-green-500" value={payDate} onChange={e => setPayDate(e.target.value)} /></div>
                     </div>
@@ -1581,6 +1593,7 @@ const { useState, useEffect, useMemo, useRef } = React;
             const [extraFees, setExtraFees] = useState(settings.extraFees || []);
             const [receiptRequired, setReceiptRequired] = useState(settings.receiptRequired !== false);
             const [nextReceiptInput, setNextReceiptInput] = useState(settings.lastReceiptNumber || '');
+            const [headerColor, setHeaderColor] = useState(settings.headerColor || '#15803d');
             const [saving, setSaving] = useState(false);
 
             const [newFeeName, setNewFeeName] = useState('');
@@ -1594,6 +1607,7 @@ const { useState, useEffect, useMemo, useRef } = React;
             useEffect(() => { setExtraFees(settings.extraFees || []); }, [settings.extraFees]);
             useEffect(() => { setReceiptRequired(settings.receiptRequired !== false); }, [settings.receiptRequired]);
             useEffect(() => { setNextReceiptInput(settings.lastReceiptNumber || ''); }, [settings.lastReceiptNumber]);
+            useEffect(() => { setHeaderColor(settings.headerColor || '#15803d'); }, [settings.headerColor]);
 
             const resetFeeForm = () => {
                 setNewFeeName(''); setNewFeeAmount(''); setNewFeeMode('ALL'); setNewFeeClass('+2'); setEditingFeeId(null); setEditFeeModalOpen(false); setClassAmounts(Object.fromEntries(CLASSES.map(c => [c, ''])));
@@ -1673,7 +1687,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                 e.preventDefault(); setSaving(true);
                 await db.collection('settings').doc('global').set({
                     globalBaseFee: parseInt(baseFee), academicStartMonth: startMonth, academicEndMonth: endMonth,
-                    institutionName: institutionName.trim(), institutionPlace: institutionPlace.trim(), registerNumber: registerNumber.trim(), logo: logo.trim(), extraFees, receiptRequired, lastReceiptNumber: nextReceiptInput.trim()
+                    institutionName: institutionName.trim(), institutionPlace: institutionPlace.trim(), registerNumber: registerNumber.trim(), logo: logo.trim(), extraFees, receiptRequired, lastReceiptNumber: nextReceiptInput.trim(), headerColor
                 }, { merge: true });
                 setSaving(false); showAlert("Settings updated successfully!", "Success");
             };
@@ -1697,6 +1711,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                 </div>
                                 {logo && <div className="flex items-center gap-3"><img src={logo} className="w-20 h-20 rounded-full object-cover border" /><button type="button" onClick={() => setLogo('')} className="px-3 py-1.5 rounded border border-red-200 text-red-600 text-xs font-bold hover:bg-red-50">Remove Logo</button></div>}
                                 <div><label className="block text-sm font-bold mb-1 text-gray-700">Default Base Fee (₹)</label><input type="number" required min="0" className="w-full px-4 py-2 border rounded-md text-lg font-bold outline-none" value={baseFee} onChange={e => setBaseFee(e.target.value)} /></div>
+                                <div><label className="block text-sm font-bold mb-1 text-gray-700">Header Color</label><input type="color" className="w-full h-11 px-2 py-1 border rounded-md bg-white" value={headerColor} onChange={e => setHeaderColor(e.target.value)} /></div>
                                 <div className="p-4 rounded-lg border bg-yellow-50 border-yellow-200 space-y-3"><div className="flex items-center justify-between gap-3"><div><div className="font-black text-yellow-900">Receipt Number Required</div><p className="text-xs text-yellow-700">ON ആണെങ്കിൽ receipt number നിർബന്ധമാണ്; OFF ആണെങ്കിൽ fee entry receipt blank ആയിരിക്കും.</p></div><button type="button" onClick={() => setReceiptRequired(v => !v)} className={`w-16 h-8 rounded-full p-1 transition ${receiptRequired ? 'bg-green-600' : 'bg-gray-300'}`}><span className={`block w-6 h-6 bg-white rounded-full shadow transition ${receiptRequired ? 'translate-x-8' : ''}`}></span></button></div>{receiptRequired && <div><label className="block text-xs font-black text-yellow-900 mb-1">Next Receipt Number</label><input className="w-full px-3 py-2 border rounded font-black uppercase" value={nextReceiptInput} onChange={e => setNextReceiptInput(e.target.value)} placeholder="Enter next receipt number" /></div>}</div>
                                 <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg"><label className="block text-sm font-bold mb-3 text-blue-900">Academic Year Months</label><div className="grid grid-cols-2 gap-4"><select className="w-full p-2 border rounded bg-white" value={startMonth} onChange={e => setStartMonth(e.target.value)}>{ALL_MONTHS_BASE.map(m => <option key={m}>{m}</option>)}</select><select className="w-full p-2 border rounded bg-white" value={endMonth} onChange={e => setEndMonth(e.target.value)}>{ALL_MONTHS_BASE.map(m => <option key={m}>{m}</option>)}</select></div></div>
                             </div>
