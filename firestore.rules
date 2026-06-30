@@ -32,17 +32,19 @@ service cloud.firestore {
     function isValidSettings() {
       return request.resource.data.keys().hasAll([
         'globalBaseFee', 'academicStartMonth', 'academicEndMonth',
-        'institutionName', 'institutionPlace', 'registerNumber', 'logo', 'extraFees'
+        'institutionName', 'institutionPlace', 'registerNumber', 'logo', 'extraFees', 'receiptRequired', 'lastReceiptNumber'
       ])
       && request.resource.data.keys().hasOnly([
         'globalBaseFee', 'academicStartMonth', 'academicEndMonth',
-        'institutionName', 'institutionPlace', 'registerNumber', 'logo', 'extraFees'
+        'institutionName', 'institutionPlace', 'registerNumber', 'logo', 'extraFees', 'receiptRequired', 'lastReceiptNumber'
       ])
       && request.resource.data.globalBaseFee is int
       && request.resource.data.academicStartMonth is string
       && request.resource.data.academicEndMonth is string
       && request.resource.data.institutionName is string
-      && request.resource.data.extraFees is list;
+      && request.resource.data.extraFees is list
+      && request.resource.data.receiptRequired is bool
+      && request.resource.data.lastReceiptNumber is string;
     }
 
     match /students/{studentId} {

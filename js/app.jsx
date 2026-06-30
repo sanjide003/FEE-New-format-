@@ -32,7 +32,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                 <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
                     <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 transform transition-all">
                         <h3 className={`text-lg font-bold mb-2 ${type === 'danger' ? 'text-red-600' : 'text-blue-600'}`}>{title}</h3>
-                        <p className="text-gray-700 mb-6 text-sm leading-relaxed">{message}</p>
+                        <p className="text-gray-700 mb-6 text-sm leading-relaxed whitespace-pre-line">{message}</p>
                         <div className="flex justify-end space-x-3">
                             <button onClick={onCancel} className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 text-sm font-bold text-gray-700">Cancel</button>
                             <button onClick={onConfirm} className={`px-4 py-2 rounded-md text-white text-sm font-bold shadow-md ${type === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
@@ -72,7 +72,9 @@ const { useState, useEffect, useMemo, useRef } = React;
                 institutionPlace: '',
                 registerNumber: '',
                 logo: '',
-                extraFees: [] 
+                extraFees: [],
+                receiptRequired: true,
+                lastReceiptNumber: ''
             });
             const [loading, setLoading] = useState(true);
             const [error, setError] = useState(null);
@@ -84,18 +86,24 @@ const { useState, useEffect, useMemo, useRef } = React;
             useEffect(() => {
                 const unsubSettings = db.collection('settings').doc('global').onSnapshot(doc => {
                     if (doc.exists) {
+                        const data = doc.data();
+                        if (data.receiptRequired === undefined || data.lastReceiptNumber === undefined) {
+                            db.collection('settings').doc('global').set({ receiptRequired: data.receiptRequired !== false, lastReceiptNumber: data.lastReceiptNumber || '' }, { merge: true });
+                        }
                         setSettings({
-                            globalBaseFee: doc.data().globalBaseFee || 500,
-                            academicStartMonth: doc.data().academicStartMonth || 'Jun',
-                            academicEndMonth: doc.data().academicEndMonth || 'May',
-                            institutionName: doc.data().institutionName || 'Madrasa Fee Manager',
-                            institutionPlace: doc.data().institutionPlace || '',
-                            registerNumber: doc.data().registerNumber || '',
-                            logo: doc.data().logo || '',
-                            extraFees: doc.data().extraFees || []
+                            globalBaseFee: data.globalBaseFee || 500,
+                            academicStartMonth: data.academicStartMonth || 'Jun',
+                            academicEndMonth: data.academicEndMonth || 'May',
+                            institutionName: data.institutionName || 'Madrasa Fee Manager',
+                            institutionPlace: data.institutionPlace || '',
+                            registerNumber: data.registerNumber || '',
+                            logo: data.logo || '',
+                            extraFees: data.extraFees || [],
+                            receiptRequired: data.receiptRequired !== false,
+                            lastReceiptNumber: data.lastReceiptNumber || ''
                         });
                     } else {
-                        db.collection('settings').doc('global').set({ globalBaseFee: 500, academicStartMonth: 'Jun', academicEndMonth: 'May', institutionName: 'Madrasa Fee Manager', institutionPlace: '', registerNumber: '', logo: '', extraFees: [] });
+                        db.collection('settings').doc('global').set({ globalBaseFee: 500, academicStartMonth: 'Jun', academicEndMonth: 'May', institutionName: 'Madrasa Fee Manager', institutionPlace: '', registerNumber: '', logo: '', extraFees: [], receiptRequired: true, lastReceiptNumber: '' });
                     }
                 }, err => setError("Database Rules Error."));
 
@@ -140,7 +148,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                     <main className="flex-1 max-w-full w-full mx-auto p-4 sm:p-6 lg:p-8 bg-white shadow-inner">
                         {activeTab === 'DASHBOARD' && <DashboardTab students={students} settings={settings} dynamicMonths={dynamicMonths} />}
                         {activeTab === 'FEE_ENTRY' && <FeeEntryTab students={students} settings={settings} dynamicMonths={dynamicMonths} showAlert={showAlert} />}
-                        {activeTab === 'FEE_HISTORY' && <FeeHistoryTab students={students} settings={settings} dynamicMonths={dynamicMonths} />}
+                        {activeTab === 'FEE_HISTORY' && <FeeHistoryTab students={students} settings={settings} dynamicMonths={dynamicMonths} showAlert={showAlert} />}
                         {activeTab === 'STUDENTS' && <StudentTab students={students} settings={settings} dynamicMonths={dynamicMonths} showAlert={showAlert} />}
                         {activeTab === 'CLASSES' && <ClassManagementTab students={students} showAlert={showAlert} />}
                         {activeTab === 'SETTINGS' && <SettingsTab settings={settings} students={students} ALL_MONTHS_BASE={ALL_MONTHS_BASE} showAlert={showAlert} />}
@@ -217,14 +225,22 @@ const { useState, useEffect, useMemo, useRef } = React;
             students.forEach(student => {
                 dynamicMonths.forEach(month => {
                     const payment = student.payments?.[month];
-                    if (payment) rows.push({ id: `${student.id}_${month}`, date: payment.date || payment.timestamp?.slice(0, 10) || '-', receipt: payment.receipt || '-', studentName: student.name, studentClass: student.studentClass, type: `Monthly Fee - ${month}`, amount: parseInt(payment.lastAmount || payment.amount || 0), status: payment.status || 'PAID' });
+                    if (payment) rows.push({ id: `${student.id}_${month}`, studentId: student.id, kind: 'MONTH', key: month, date: payment.date || payment.timestamp?.slice(0, 10) || '-', receipt: payment.receipt || '-', studentName: student.name, studentClass: student.studentClass, type: `Monthly Fee - ${month}`, amount: parseInt(payment.lastAmount || payment.amount || 0), status: payment.status || 'PAID', payment });
                 });
                 (settings.extraFees || []).forEach(fee => {
                     const payment = student.extraFeePayments?.[fee.id];
-                    if (payment) rows.push({ id: `${student.id}_${fee.id}`, date: payment.date || payment.timestamp?.slice(0, 10) || '-', receipt: payment.receipt || '-', studentName: student.name, studentClass: student.studentClass, type: fee.name || 'Extra Fee', amount: parseInt(payment.amount || 0), status: payment.balance > 0 ? 'PARTIAL' : 'PAID' });
+                    if (payment) rows.push({ id: `${student.id}_${fee.id}`, studentId: student.id, kind: 'EXTRA', key: fee.id, date: payment.date || payment.timestamp?.slice(0, 10) || '-', receipt: payment.receipt || '-', studentName: student.name, studentClass: student.studentClass, type: fee.name || 'Extra Fee', amount: parseInt(payment.amount || 0), status: payment.balance > 0 ? 'PARTIAL' : 'PAID', payment });
                 });
             });
             return rows.sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.receipt).localeCompare(String(a.receipt)));
+        };
+
+        const nextReceiptNumber = (value) => {
+            const text = String(value || '').trim();
+            const match = text.match(/^(.*?)(\d+)$/);
+            if (!match) return text ? `${text}1` : String(Date.now()).slice(-6);
+            const next = String(parseInt(match[2], 10) + 1).padStart(match[2].length, '0');
+            return `${match[1]}${next}`;
         };
 
         const FeeEntryTab = ({ students, settings, dynamicMonths, showAlert }) => {
@@ -233,10 +249,12 @@ const { useState, useEffect, useMemo, useRef } = React;
             const [query, setQuery] = useState('');
             const [selectedStudent, setSelectedStudent] = useState(null);
             const [selectedItems, setSelectedItems] = useState([]);
-            const [receipt, setReceipt] = useState(() => String(Date.now()).slice(-6));
+            const [receipt, setReceipt] = useState(() => nextReceiptNumber(settings.lastReceiptNumber));
             const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
             const [description, setDescription] = useState('');
             const [saving, setSaving] = useState(false);
+
+            useEffect(() => { setReceipt(nextReceiptNumber(settings.lastReceiptNumber)); }, [settings.lastReceiptNumber]);
 
             const filteredStudents = useMemo(() => students.filter(student =>
                 (!studentClass || student.studentClass === studentClass) &&
@@ -264,29 +282,33 @@ const { useState, useEffect, useMemo, useRef } = React;
             const handleSave = async () => {
                 if (!selectedStudent) return showAlert('Please select a student first.', 'Missing Student');
                 if (!selectedItems.length) return showAlert('Please select at least one unpaid fee item.', 'No Fee Selected');
-                if (!receipt.trim()) return showAlert('Receipt number is required.', 'Missing Receipt');
+                if (settings.receiptRequired !== false && !receipt.trim()) return showAlert('Receipt number is required.', 'Missing Receipt');
                 setSaving(true);
                 try {
+                    const cleanReceipt = receipt.trim().toUpperCase();
                     const updates = {};
                     const nextPayments = { ...(selectedStudent.payments || {}) };
                     const nextExtraFeePayments = { ...(selectedStudent.extraFeePayments || {}) };
                     const now = new Date().toISOString();
                     feeItems.filter(item => selectedItems.includes(item.id)).forEach(item => {
                         if (item.type === 'MONTH') {
-                            const paymentData = { amount: item.amount, lastAmount: item.amount, status: 'FULL', receipt: receipt.trim().toUpperCase(), date: payDate, timestamp: now, entries: [{ amount: item.amount, receipt: receipt.trim().toUpperCase(), date: payDate, timestamp: now, description }], balance: 0, credit: 0, arrearsAdded: 0, isSharedFamilyPayment: false, groupId: selectedStudent.groupId || selectedStudent.id };
+                            const paymentData = { amount: item.amount, lastAmount: item.amount, status: 'FULL', receipt: cleanReceipt, date: payDate, timestamp: now, entries: [{ amount: item.amount, receipt: cleanReceipt, date: payDate, timestamp: now, description }], balance: 0, credit: 0, arrearsAdded: 0, isSharedFamilyPayment: false, groupId: selectedStudent.groupId || selectedStudent.id };
                             updates[`payments.${item.month}`] = paymentData;
                             nextPayments[item.month] = paymentData;
                         } else {
-                            const extraPaymentData = { amount: item.amount, receipt: receipt.trim().toUpperCase(), date: payDate, timestamp: now, total: item.amount, balance: 0, description };
+                            const extraPaymentData = { amount: item.amount, receipt: cleanReceipt, date: payDate, timestamp: now, total: item.amount, balance: 0, description };
                             updates[`extraFeePayments.${item.fee.id}`] = extraPaymentData;
                             nextExtraFeePayments[item.fee.id] = extraPaymentData;
                         }
                     });
-                    await db.collection('students').doc(selectedStudent.id).update(updates);
+                    const batch = db.batch();
+                    batch.update(db.collection('students').doc(selectedStudent.id), updates);
+                    if (cleanReceipt) batch.set(db.collection('settings').doc('global'), { lastReceiptNumber: cleanReceipt }, { merge: true });
+                    await batch.commit();
                     setSelectedStudent({ ...selectedStudent, payments: nextPayments, extraFeePayments: nextExtraFeePayments });
                     showAlert(`Saved ${selectedItems.length} fee item(s). Total ₹${totalAmount}`, 'Fee Saved');
                     setSelectedItems([]);
-                    setReceipt(String(Date.now()).slice(-6));
+                    setReceipt(nextReceiptNumber(cleanReceipt || settings.lastReceiptNumber));
                 } catch (err) {
                     console.error(err);
                     showAlert('Fee entry could not be saved. Please try again.', 'Save Failed');
@@ -301,7 +323,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                         <div><label className="text-sm font-bold text-gray-700">Class</label><select className="mt-1 w-full rounded-xl border p-3 text-lg outline-none focus:ring-2 focus:ring-green-500" value={studentClass} onChange={e => { setStudentClass(e.target.value); resetStudent(); }}><option value="">All Classes</option>{CLASSES.map(cls => <option key={cls} value={cls}>{cls}</option>)}</select></div>
                         <div><label className="text-sm font-bold text-gray-700">Gender</label><select className="mt-1 w-full rounded-xl border p-3 text-lg outline-none focus:ring-2 focus:ring-green-500" value={gender} onChange={e => { setGender(e.target.value); resetStudent(); }}><option value="ALL">All</option><option value="M">Male</option><option value="F">Female</option></select></div>
                         <div className="md:col-span-2 relative"><label className="text-sm font-bold text-gray-700">Student</label><div className="mt-1 flex rounded-xl border bg-white overflow-hidden focus-within:ring-2 focus-within:ring-green-500"><input className="flex-1 p-3 text-lg outline-none" placeholder="Search student name or admission no..." value={query} onChange={e => { setQuery(e.target.value); setSelectedStudent(null); setSelectedItems([]); }} />{query && <button onClick={resetStudent} className="px-4 text-gray-500 hover:bg-gray-100 font-black">×</button>}</div>{query && !selectedStudent && <div className="absolute z-30 mt-1 w-full bg-white border rounded-xl shadow-lg max-h-64 overflow-y-auto">{filteredStudents.length ? filteredStudents.map(student => <button key={student.id} onClick={() => selectStudent(student)} className="w-full text-left px-4 py-3 hover:bg-green-50 border-b"><span className="font-black text-gray-800">{student.name}</span><span className="ml-2 text-xs text-gray-500">Class {student.studentClass} • Adm: {student.profile?.admNo || '-'}</span></button>) : <div className="p-4 text-sm text-gray-500">No students found.</div>}</div>}</div>
-                        <div><label className="text-sm font-bold text-gray-700">Receipt No. <span className="text-red-500">*</span></label><input className="mt-1 w-full rounded-xl border p-3 text-lg font-black text-blue-700 outline-none focus:ring-2 focus:ring-green-500" value={receipt} onChange={e => setReceipt(e.target.value)} /></div>
+                        <div><label className="text-sm font-bold text-gray-700">Receipt No. {settings.receiptRequired !== false && <span className="text-red-500">*</span>}</label><input className="mt-1 w-full rounded-xl border p-3 text-lg font-black text-blue-700 outline-none focus:ring-2 focus:ring-green-500" value={receipt} onChange={e => setReceipt(e.target.value)} /></div>
                         <div><label className="text-sm font-bold text-gray-700">Date</label><input type="date" className="mt-1 w-full rounded-xl border p-3 text-lg outline-none focus:ring-2 focus:ring-green-500" value={payDate} onChange={e => setPayDate(e.target.value)} /></div>
                     </div>
                     <div className="mt-6"><h3 className="font-black text-gray-800 mb-3">Fee Items</h3>{selectedStudent ? <div className="space-y-4"><div><div className="text-xs font-black text-blue-700 tracking-widest mb-2">MONTHLY FEES</div><div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">{feeItems.filter(item => item.type === 'MONTH').map(item => { const active = selectedItems.includes(item.id); return <button key={item.id} disabled={item.paid} onClick={() => toggleItem(item)} className={`rounded-xl border-2 p-3 min-h-[78px] text-center transition ${item.paid ? 'bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed' : active ? 'bg-green-50 border-green-500 text-green-800 shadow' : 'bg-red-50 border-red-300 text-red-800 hover:border-green-400'}`}><div className="font-black">{item.label}</div><div className="text-xs">₹{item.amount}</div>{item.paid && <div className="text-[10px] mt-1">Rcpt: {item.paidInfo}</div>}</button>; })}</div></div>{feeItems.some(item => item.type === 'EXTRA') && <div><div className="text-xs font-black text-purple-700 tracking-widest mb-2">EXTRA FEES</div><div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">{feeItems.filter(item => item.type === 'EXTRA').map(item => { const active = selectedItems.includes(item.id); return <button key={item.id} disabled={item.paid} onClick={() => toggleItem(item)} className={`rounded-xl border-2 p-3 min-h-[78px] text-center transition ${item.paid ? 'bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed' : active ? 'bg-green-50 border-green-500 text-green-800 shadow' : 'bg-red-50 border-red-300 text-red-800 hover:border-green-400'}`}><div className="font-black">{item.label}</div><div className="text-xs">₹{item.amount}</div>{item.paid && <div className="text-[10px] mt-1">Rcpt: {item.paidInfo}</div>}</button>; })}</div></div>}</div> : <div className="rounded-xl border border-dashed p-8 text-center text-gray-500 bg-gray-50">Select a student to show unpaid and paid fee items.</div>}</div>
@@ -311,9 +333,38 @@ const { useState, useEffect, useMemo, useRef } = React;
             </div>;
         };
 
-        const FeeHistoryTab = ({ students, settings, dynamicMonths }) => {
+        const FeeHistoryTab = ({ students, settings, dynamicMonths, showAlert }) => {
             const rows = buildFeeHistoryRows(students, settings, dynamicMonths);
-            return <div className="space-y-5"><div className="bg-gradient-to-r from-blue-700 to-indigo-600 text-white rounded-2xl p-6 shadow"><h2 className="text-3xl font-black">Fee History</h2><p className="text-blue-100">Latest monthly and extra-fee entries saved in student records.</p></div><div className="bg-white rounded-xl border shadow overflow-hidden"><div className="overflow-x-auto"><table className="min-w-full text-sm"><thead className="bg-gray-100"><tr><th className="p-3 border text-left">Date</th><th className="p-3 border text-left">Receipt</th><th className="p-3 border text-left">Student</th><th className="p-3 border text-center">Class</th><th className="p-3 border text-left">Item</th><th className="p-3 border text-right">Amount</th><th className="p-3 border text-center">Status</th></tr></thead><tbody>{rows.length ? rows.map(row => <tr key={row.id} className="hover:bg-gray-50"><td className="p-3 border font-bold">{row.date}</td><td className="p-3 border font-black text-blue-700">{row.receipt}</td><td className="p-3 border font-bold">{row.studentName}</td><td className="p-3 border text-center">{row.studentClass}</td><td className="p-3 border">{row.type}</td><td className="p-3 border text-right font-black">₹{row.amount}</td><td className="p-3 border text-center"><span className="rounded-full bg-green-100 text-green-800 px-2 py-1 text-xs font-black">{row.status}</span></td></tr>) : <tr><td colSpan="7" className="p-8 text-center text-gray-500">No fee history yet.</td></tr>}</tbody></table></div></div></div>;
+            const [editingRow, setEditingRow] = useState(null);
+            const [editAmount, setEditAmount] = useState('');
+            const [editReceipt, setEditReceipt] = useState('');
+            const [editDate, setEditDate] = useState('');
+            const [deletingRow, setDeletingRow] = useState(null);
+            const startEdit = (row) => { setEditingRow(row); setEditAmount(row.amount || ''); setEditReceipt(row.receipt === '-' ? '' : row.receipt); setEditDate(row.date === '-' ? new Date().toISOString().split('T')[0] : row.date); };
+            const saveEdit = async () => {
+                if (!editingRow) return;
+                const amount = parseInt(editAmount || 0);
+                if (!amount || amount < 0) return showAlert('Enter a valid amount.', 'Invalid Amount');
+                const base = { ...(editingRow.payment || {}), amount, lastAmount: amount, receipt: editReceipt.trim().toUpperCase(), date: editDate, timestamp: editingRow.payment?.timestamp || new Date().toISOString() };
+                if (editingRow.kind === 'MONTH') {
+                    base.balance = 0; base.credit = 0; base.arrearsAdded = 0; base.status = 'FULL';
+                    if (Array.isArray(base.entries) && base.entries.length) base.entries = [{ ...base.entries[0], amount, receipt: base.receipt, date: editDate }];
+                    await db.collection('students').doc(editingRow.studentId).update({ [`payments.${editingRow.key}`]: base });
+                } else {
+                    await db.collection('students').doc(editingRow.studentId).update({ [`extraFeePayments.${editingRow.key}`]: { ...base, total: amount, balance: 0 } });
+                }
+                setEditingRow(null); showAlert('History entry updated successfully.', 'Updated');
+            };
+            const deleteEntry = async () => {
+                if (!deletingRow) return;
+                const field = deletingRow.kind === 'MONTH' ? `payments.${deletingRow.key}` : `extraFeePayments.${deletingRow.key}`;
+                await db.collection('students').doc(deletingRow.studentId).update({ [field]: firebase.firestore.FieldValue.delete() });
+                setDeletingRow(null); showAlert('History entry deleted successfully.', 'Deleted');
+            };
+            return <div className="space-y-5"><div className="bg-gradient-to-r from-blue-700 to-indigo-600 text-white rounded-2xl p-6 shadow"><h2 className="text-3xl font-black">Fee History</h2><p className="text-blue-100">Latest monthly and extra-fee entries saved in student records.</p></div><div className="bg-white rounded-xl border shadow overflow-hidden"><div className="overflow-x-auto"><table className="min-w-full text-sm"><thead className="bg-gray-100"><tr><th className="p-3 border text-left">Date</th><th className="p-3 border text-left">Receipt</th><th className="p-3 border text-left">Student</th><th className="p-3 border text-center">Class</th><th className="p-3 border text-left">Item</th><th className="p-3 border text-right">Amount</th><th className="p-3 border text-center">Status</th><th className="p-3 border text-center">Action</th></tr></thead><tbody>{rows.length ? rows.map(row => <tr key={row.id} className="hover:bg-gray-50"><td className="p-3 border font-bold">{row.date}</td><td className="p-3 border font-black text-blue-700">{row.receipt}</td><td className="p-3 border font-bold">{row.studentName}</td><td className="p-3 border text-center">{row.studentClass}</td><td className="p-3 border">{row.type}</td><td className="p-3 border text-right font-black">₹{row.amount}</td><td className="p-3 border text-center"><span className="rounded-full bg-green-100 text-green-800 px-2 py-1 text-xs font-black">{row.status}</span></td><td className="p-3 border text-center"><div className="flex justify-center gap-2"><button onClick={() => startEdit(row)} className="px-2 py-1 text-xs font-bold text-blue-700 border border-blue-200 rounded hover:bg-blue-50">Edit</button><button onClick={() => setDeletingRow(row)} className="px-2 py-1 text-xs font-bold text-red-700 border border-red-200 rounded hover:bg-red-50">Delete</button></div></td></tr>) : <tr><td colSpan="8" className="p-8 text-center text-gray-500">No fee history yet.</td></tr>}</tbody></table></div></div>
+                {editingRow && <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[90] p-4"><div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden"><div className="bg-blue-700 text-white px-5 py-4 flex justify-between items-center"><h3 className="font-black">Edit Fee Entry</h3><button onClick={() => setEditingRow(null)}><Icons.Close /></button></div><div className="p-5 space-y-3"><div className="text-sm font-bold text-gray-700">{editingRow.studentName} • {editingRow.type}</div><div><label className="text-xs font-bold text-gray-500">Amount</label><input type="number" className="w-full border rounded p-2 font-bold" value={editAmount} onChange={e => setEditAmount(e.target.value)} /></div><div><label className="text-xs font-bold text-gray-500">Receipt</label><input className="w-full border rounded p-2 font-bold uppercase" value={editReceipt} onChange={e => setEditReceipt(e.target.value)} /></div><div><label className="text-xs font-bold text-gray-500">Date</label><input type="date" className="w-full border rounded p-2 font-bold" value={editDate} onChange={e => setEditDate(e.target.value)} /></div><div className="flex justify-end gap-2 pt-3 border-t"><button onClick={() => setEditingRow(null)} className="px-4 py-2 bg-gray-200 rounded font-bold">Cancel</button><button onClick={saveEdit} className="px-5 py-2 bg-blue-700 text-white rounded font-bold">Update</button></div></div></div></div>}
+                <CustomConfirm isOpen={!!deletingRow} title="Delete History Entry" message={`Delete ${deletingRow?.type || ''} for ${deletingRow?.studentName || ''}?`} confirmText="Delete" onConfirm={deleteEntry} onCancel={() => setDeletingRow(null)} />
+            </div>;
         };
 
         // --- STUDENTS TAB COMPONENT ---
@@ -1433,9 +1484,29 @@ const { useState, useEffect, useMemo, useRef } = React;
             const totalGirls = classRows.reduce((sum, row) => sum + row.girls, 0);
             const grandTotal = classRows.reduce((sum, row) => sum + row.total, 0);
 
+            const groupedClassStudents = (cls) => students.filter(student => student.studentClass === cls && students.some(other => other.id !== student.id && other.groupId === student.groupId));
+            const groupWarningMessage = (cls) => groupedClassStudents(cls).map(student => {
+                const members = students.filter(other => other.groupId === student.groupId && other.id !== student.id).map(other => `${other.name} (Class ${other.studentClass})`).join(', ');
+                return `${student.name} is in group ${student.groupId}: ${members}`;
+            }).join('\n');
+            const detachClassGroups = async () => {
+                if (!confirmClass) return;
+                const groupedTargets = groupedClassStudents(confirmClass.cls);
+                const affectedGroupIds = new Set(groupedTargets.map(student => student.groupId));
+                const membersToDetach = students.filter(student => affectedGroupIds.has(student.groupId));
+                for (let i = 0; i < membersToDetach.length; i += 450) {
+                    const batch = db.batch();
+                    membersToDetach.slice(i, i + 450).forEach(student => batch.update(db.collection('students').doc(student.id), { groupId: student.id, groupFee: null }));
+                    await batch.commit();
+                }
+                setConfirmClass({ ...confirmClass, groupsDetached: true });
+                showAlert('Grouped students have been removed from their groups. You can now confirm class delete.', 'Groups Removed');
+            };
             const executeDeleteClass = async () => {
                 if (!confirmClass) return;
                 const targets = students.filter(s => s.studentClass === confirmClass.cls);
+                const groupedTargets = groupedClassStudents(confirmClass.cls);
+                if (groupedTargets.length && !confirmClass.groupsDetached) return detachClassGroups();
                 for (let i = 0; i < targets.length; i += 450) {
                     const batch = db.batch();
                     targets.slice(i, i + 450).forEach(student => batch.delete(db.collection('students').doc(student.id)));
@@ -1455,10 +1526,10 @@ const { useState, useEffect, useMemo, useRef } = React;
                     <div className="bg-white border rounded-xl shadow overflow-hidden">
                         <table className="min-w-full text-sm">
                             <thead className="bg-gray-100 text-gray-700 uppercase text-xs"><tr><th className="p-3 text-left">Class</th><th className="p-3 text-center">Boys</th><th className="p-3 text-center">Girls</th><th className="p-3 text-center">Total</th><th className="p-3 text-right">Action</th></tr></thead>
-                            <tbody>{classRows.map(row => <tr key={row.cls} className="border-t hover:bg-blue-50"><td className="p-3 font-black text-blue-900">Class {row.cls}</td><td className="p-3 text-center font-bold text-blue-700">{row.boys}</td><td className="p-3 text-center font-bold text-pink-700">{row.girls}</td><td className="p-3 text-center font-black text-gray-900">{row.total}</td><td className="p-3 text-right"><button disabled={row.total === 0} onClick={() => setConfirmClass(row)} className="px-4 py-2 bg-red-600 text-white rounded font-bold text-xs shadow hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed">Delete</button></td></tr>)}</tbody><tfoot className="bg-gray-900 text-white font-black"><tr><td className="p-3">TOTAL</td><td className="p-3 text-center">{totalBoys}</td><td className="p-3 text-center">{totalGirls}</td><td className="p-3 text-center">{grandTotal}</td><td></td></tr></tfoot>
+                            <tbody>{classRows.map(row => <tr key={row.cls} className="border-t hover:bg-blue-50"><td className="p-3 font-black text-blue-900">Class {row.cls}</td><td className="p-3 text-center font-bold text-blue-700">{row.boys}</td><td className="p-3 text-center font-bold text-pink-700">{row.girls}</td><td className="p-3 text-center font-black text-gray-900">{row.total}</td><td className="p-3 text-right"><button disabled={row.total === 0} onClick={() => setConfirmClass({ ...row, groupsDetached: false })} className="px-4 py-2 bg-red-600 text-white rounded font-bold text-xs shadow hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed">Delete</button></td></tr>)}</tbody><tfoot className="bg-gray-900 text-white font-black"><tr><td className="p-3">TOTAL</td><td className="p-3 text-center">{totalBoys}</td><td className="p-3 text-center">{totalGirls}</td><td className="p-3 text-center">{grandTotal}</td><td></td></tr></tfoot>
                         </table>
                     </div>
-                    <CustomConfirm isOpen={!!confirmClass} title="Delete Class" message={`Delete Class ${confirmClass?.cls}? This will permanently delete ${confirmClass?.total || 0} student record(s) in this class. This cannot be undone.`} confirmText="Delete Class" onConfirm={executeDeleteClass} onCancel={() => setConfirmClass(null)} />
+                    <CustomConfirm isOpen={!!confirmClass} title={groupedClassStudents(confirmClass?.cls).length && !confirmClass?.groupsDetached ? 'Remove Students From Groups First' : 'Delete Class'} message={groupedClassStudents(confirmClass?.cls).length && !confirmClass?.groupsDetached ? `Class ${confirmClass?.cls} has grouped students. Remove them from groups before deleting the class.\n\n${groupWarningMessage(confirmClass?.cls)}` : `Delete Class ${confirmClass?.cls}? This will permanently delete ${confirmClass?.total || 0} student record(s) in this class. This cannot be undone.`} confirmText={groupedClassStudents(confirmClass?.cls).length && !confirmClass?.groupsDetached ? 'Remove From Groups' : 'Delete Class'} onConfirm={executeDeleteClass} onCancel={() => setConfirmClass(null)} />
                 </div>
             );
         };
@@ -1473,6 +1544,7 @@ const { useState, useEffect, useMemo, useRef } = React;
             const [registerNumber, setRegisterNumber] = useState(settings.registerNumber || '');
             const [logo, setLogo] = useState(settings.logo || '');
             const [extraFees, setExtraFees] = useState(settings.extraFees || []);
+            const [receiptRequired, setReceiptRequired] = useState(settings.receiptRequired !== false);
             const [saving, setSaving] = useState(false);
 
             const [newFeeName, setNewFeeName] = useState('');
@@ -1484,6 +1556,7 @@ const { useState, useEffect, useMemo, useRef } = React;
             const [editFeeModalOpen, setEditFeeModalOpen] = useState(false);
 
             useEffect(() => { setExtraFees(settings.extraFees || []); }, [settings.extraFees]);
+            useEffect(() => { setReceiptRequired(settings.receiptRequired !== false); }, [settings.receiptRequired]);
 
             const resetFeeForm = () => {
                 setNewFeeName(''); setNewFeeAmount(''); setNewFeeMode('ALL'); setNewFeeClass('+2'); setEditingFeeId(null); setEditFeeModalOpen(false); setClassAmounts(Object.fromEntries(CLASSES.map(c => [c, ''])));
@@ -1563,7 +1636,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                 e.preventDefault(); setSaving(true);
                 await db.collection('settings').doc('global').set({ 
                     globalBaseFee: parseInt(baseFee), academicStartMonth: startMonth, academicEndMonth: endMonth,
-                    institutionName: institutionName.trim(), institutionPlace: institutionPlace.trim(), registerNumber: registerNumber.trim(), logo: logo.trim(), extraFees
+                    institutionName: institutionName.trim(), institutionPlace: institutionPlace.trim(), registerNumber: registerNumber.trim(), logo: logo.trim(), extraFees, receiptRequired
                 }, { merge: true });
                 setSaving(false); showAlert("Settings updated successfully!", "Success");
             };
@@ -1587,6 +1660,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                 </div>
                                 {logo && <div className="flex items-center gap-3"><img src={logo} className="w-20 h-20 rounded-full object-cover border" /><button type="button" onClick={() => setLogo('')} className="px-3 py-1.5 rounded border border-red-200 text-red-600 text-xs font-bold hover:bg-red-50">Remove Logo</button></div>}
                                 <div><label className="block text-sm font-bold mb-1 text-gray-700">Default Base Fee (₹)</label><input type="number" required min="0" className="w-full px-4 py-2 border rounded-md text-lg font-bold outline-none" value={baseFee} onChange={e => setBaseFee(e.target.value)} /></div>
+                                <div className="p-4 rounded-lg border bg-yellow-50 border-yellow-200 flex items-center justify-between gap-3"><div><div className="font-black text-yellow-900">Receipt Number Required</div><p className="text-xs text-yellow-700">ON ആണെങ്കിൽ fee entry save ചെയ്യാൻ receipt number നിർബന്ധമാണ്.</p></div><button type="button" onClick={() => setReceiptRequired(v => !v)} className={`w-16 h-8 rounded-full p-1 transition ${receiptRequired ? 'bg-green-600' : 'bg-gray-300'}`}><span className={`block w-6 h-6 bg-white rounded-full shadow transition ${receiptRequired ? 'translate-x-8' : ''}`}></span></button></div>
                                 <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg"><label className="block text-sm font-bold mb-3 text-blue-900">Academic Year Months</label><div className="grid grid-cols-2 gap-4"><select className="w-full p-2 border rounded bg-white" value={startMonth} onChange={e => setStartMonth(e.target.value)}>{ALL_MONTHS_BASE.map(m => <option key={m}>{m}</option>)}</select><select className="w-full p-2 border rounded bg-white" value={endMonth} onChange={e => setEndMonth(e.target.value)}>{ALL_MONTHS_BASE.map(m => <option key={m}>{m}</option>)}</select></div></div>
                             </div>
                             <button type="submit" disabled={saving} className="mt-6 w-full py-3 bg-green-600 hover:bg-green-700 rounded-md font-bold text-white shadow-md">{saving ? 'Saving...' : 'Save All Settings'}</button>
