@@ -2,7 +2,7 @@ const { useState, useEffect, useMemo, useRef } = React;
 
         // Firebase services are initialized in js/firebase-config.js
 
-        // Constants 
+        // Constants
         const ALL_MONTHS_BASE = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         const CLASSES = ['+2', '+1', '10', '9', '8', '7', '6', '5', '4', '3', '2', '1'];
 
@@ -64,9 +64,9 @@ const { useState, useEffect, useMemo, useRef } = React;
             const [activeTab, setActiveTab] = useState('DASHBOARD');
             const [menuOpen, setMenuOpen] = useState(false);
             const [students, setStudents] = useState([]);
-            const [settings, setSettings] = useState({ 
-                globalBaseFee: 500, 
-                academicStartMonth: 'Jun', 
+            const [settings, setSettings] = useState({
+                globalBaseFee: 500,
+                academicStartMonth: 'Jun',
                 academicEndMonth: 'May',
                 institutionName: 'Madrasa Fee Manager',
                 institutionPlace: '',
@@ -249,12 +249,12 @@ const { useState, useEffect, useMemo, useRef } = React;
             const [query, setQuery] = useState('');
             const [selectedStudent, setSelectedStudent] = useState(null);
             const [selectedItems, setSelectedItems] = useState([]);
-            const [receipt, setReceipt] = useState(() => nextReceiptNumber(settings.lastReceiptNumber));
+            const [receipt, setReceipt] = useState(() => settings.receiptRequired === false ? '' : (settings.lastReceiptNumber || nextReceiptNumber('')));
             const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
             const [description, setDescription] = useState('');
             const [saving, setSaving] = useState(false);
 
-            useEffect(() => { setReceipt(nextReceiptNumber(settings.lastReceiptNumber)); }, [settings.lastReceiptNumber]);
+            useEffect(() => { setReceipt(settings.receiptRequired === false ? '' : (settings.lastReceiptNumber || nextReceiptNumber(''))); }, [settings.lastReceiptNumber, settings.receiptRequired]);
 
             const filteredStudents = useMemo(() => students.filter(student =>
                 (!studentClass || student.studentClass === studentClass) &&
@@ -303,12 +303,12 @@ const { useState, useEffect, useMemo, useRef } = React;
                     });
                     const batch = db.batch();
                     batch.update(db.collection('students').doc(selectedStudent.id), updates);
-                    if (cleanReceipt) batch.set(db.collection('settings').doc('global'), { lastReceiptNumber: cleanReceipt }, { merge: true });
+                    if (cleanReceipt && settings.receiptRequired !== false) batch.set(db.collection('settings').doc('global'), { lastReceiptNumber: nextReceiptNumber(cleanReceipt) }, { merge: true });
                     await batch.commit();
                     setSelectedStudent({ ...selectedStudent, payments: nextPayments, extraFeePayments: nextExtraFeePayments });
                     showAlert(`Saved ${selectedItems.length} fee item(s). Total ₹${totalAmount}`, 'Fee Saved');
                     setSelectedItems([]);
-                    setReceipt(nextReceiptNumber(cleanReceipt || settings.lastReceiptNumber));
+                    setReceipt(settings.receiptRequired === false ? '' : nextReceiptNumber(cleanReceipt || settings.lastReceiptNumber));
                 } catch (err) {
                     console.error(err);
                     showAlert('Fee entry could not be saved. Please try again.', 'Save Failed');
@@ -370,7 +370,7 @@ const { useState, useEffect, useMemo, useRef } = React;
         // --- STUDENTS TAB COMPONENT ---
         const StudentTab = ({ students, settings, dynamicMonths, showAlert }) => {
             const [search, setSearch] = useState('');
-            
+
             // Filters
             const [classFilter, setClassFilter] = useState('');
             const [classSort, setClassSort] = useState('CLASS_DESC');
@@ -378,10 +378,10 @@ const { useState, useEffect, useMemo, useRef } = React;
             const [genderSort, setGenderSort] = useState('MIXED');
             const [statusFilter, setStatusFilter] = useState('ALL');
 
-            
+
             const [familyModalOpen, setFamilyModalOpen] = useState(false);
             const [selectedFamilyStudent, setSelectedFamilyStudent] = useState(null);
-            
+
             const [paymentModalOpen, setPaymentModalOpen] = useState(false);
             const [paymentGroupData, setPaymentGroupData] = useState(null);
 
@@ -405,7 +405,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                 let result = [...students];
                 if (search) {
                     const q = search.toLowerCase();
-                    result = result.filter(s => 
+                    result = result.filter(s =>
                         s.name?.toLowerCase().includes(q) || s.phone?.includes(q) || s.guardian?.toLowerCase().includes(q) ||
                         (s.payments && Object.values(s.payments).some(p => p.receipt?.toLowerCase().includes(q)))
                     );
@@ -590,7 +590,7 @@ const { useState, useEffect, useMemo, useRef } = React;
 
             const openPaymentModal = (groupMembers, month, feeOverride = null) => {
                 const groupFee = feeOverride ?? (groupMembers[0]?.groupFee || (groupMembers.length * settings.globalBaseFee));
-                const existingPayment = groupMembers[0]?.payments?.[month]; 
+                const existingPayment = groupMembers[0]?.payments?.[month];
                 setPaymentGroupData({ members: groupMembers, month, groupFee, existingPayment });
                 setPaymentModalOpen(true);
             };
@@ -667,8 +667,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                         const payment = student.payments?.[month];
                         if (!payment) return '---';
                         const balance = payment.balance ?? payment.arrearsAdded ?? 0;
-                        const credit = payment.credit || 0;
-                        return [payment.receipt || String(payment.amount || 0), balance > 0 ? `Bal: ${balance}` : '', credit > 0 ? `Cr: ${credit}` : ''].filter(Boolean).join('\n');
+                        return [payment.receipt || String(payment.amount || 0), balance > 0 ? `Bal: ${balance}` : ''].filter(Boolean).join('\n');
                     });
                     return { idx: idx + 1, classText, nameText, guardian: wrapPdfText(student.guardian || '-', 20), phone: student.phone || '-', groupFee, totalExFee, dueExFee, arrears, monthValues };
                 });
@@ -761,8 +760,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                     }
                     const groupFee = groupMembers[0]?.groupFee || (groupMembers.length * settings.globalBaseFee);
                     const balance = payment?.balance ?? payment?.arrearsAdded ?? 0;
-                    const credit = payment?.credit || 0;
-                    cells.push(<td key={month} className={`px-1.5 py-1 border-r cursor-pointer transition-colors min-w-[110px] ${payment ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-red-50'}`} onClick={() => openPaymentModal(groupMembers, month)}><div className="relative"><input type="checkbox" checked={isMonthSelected(groupMembers[0]?.groupId, month)} onChange={(e) => toggleMonthSelection(e, groupMembers, month, groupFee)} onClick={(e) => e.stopPropagation()} className="absolute -top-0.5 -left-0.5 w-3 h-3 accent-green-700" />{!payment ? <div className="min-h-[52px] flex flex-col items-center justify-center text-red-600 pt-2"><span className="w-6 h-6 rounded-full bg-red-100 border border-red-300 flex items-center justify-center text-[10px] font-black">!</span><span className="text-[10px] font-bold mt-1">Not Paid</span>{groupMembers.length > 1 && <button type="button" onClick={(e) => { e.stopPropagation(); openPaymentModal([student], month, settings.globalBaseFee); }} className="mt-1 rounded bg-yellow-100 px-1.5 py-0.5 text-[9px] font-black text-yellow-900 hover:bg-yellow-200">Separate</button>}</div> : <div className={`rounded-lg border p-1.5 text-[10px] leading-tight whitespace-normal shadow-sm ${payment.status === 'FULL' || payment.status === 'CREDIT' ? 'bg-green-100 border-green-300 text-green-900' : 'bg-yellow-50 border-yellow-300 text-yellow-900'}`}><div className="flex items-center justify-center gap-1 font-black text-[11px] mb-1">{payment.status === 'CREDIT' ? <span className="text-blue-700">Credit</span> : (payment.status === 'FULL' ? <span className="text-green-700">✓ Paid</span> : <span className="text-yellow-800">Partial</span>)}</div><div className="font-bold">Date: {payment.date || '-'}</div><div className="font-bold">Rec: {payment.receipt || 'N/A'}</div><div>Paid: ₹{payment.amount || 0}</div>{groupMembers.length > 1 && <button type="button" onClick={(e) => { e.stopPropagation(); openPaymentModal([student], month, settings.globalBaseFee); }} className="mt-1 w-full rounded bg-yellow-100 px-1 py-0.5 text-[9px] font-black text-yellow-900 hover:bg-yellow-200">Separate</button>}{balance > 0 && <div className="text-red-700 font-black">Bal: ₹{balance}</div>}{credit > 0 && <div className="text-blue-700 font-black">Credit: ₹{credit}</div>}</div>}</div></td>);
+                    cells.push(<td key={month} className={`px-1.5 py-1 border-r cursor-pointer transition-colors min-w-[110px] ${payment ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-red-50'}`} onClick={() => openPaymentModal(groupMembers, month)}><div className="relative"><input type="checkbox" checked={isMonthSelected(groupMembers[0]?.groupId, month)} onChange={(e) => toggleMonthSelection(e, groupMembers, month, groupFee)} onClick={(e) => e.stopPropagation()} className="absolute -top-0.5 -left-0.5 w-3 h-3 accent-green-700" />{!payment ? <div className="min-h-[52px] flex flex-col items-center justify-center text-red-600 pt-2"><span className="w-6 h-6 rounded-full bg-red-100 border border-red-300 flex items-center justify-center text-[10px] font-black">!</span><span className="text-[10px] font-bold mt-1">Not Paid</span>{groupMembers.length > 1 && <button type="button" onClick={(e) => { e.stopPropagation(); openPaymentModal([student], month, settings.globalBaseFee); }} className="mt-1 rounded bg-yellow-100 px-1.5 py-0.5 text-[9px] font-black text-yellow-900 hover:bg-yellow-200">Separate</button>}</div> : <div className={`rounded-lg border p-1.5 text-[10px] leading-tight whitespace-normal shadow-sm ${payment.status === 'FULL' ? 'bg-green-100 border-green-300 text-green-900' : 'bg-yellow-50 border-yellow-300 text-yellow-900'}`}><div className="flex items-center justify-center gap-1 font-black text-[11px] mb-1">{payment.status === 'FULL' ? <span className="text-green-700">✓ Paid</span> : <span className="text-yellow-800">Partial</span>}</div><div className="font-bold">Date: {payment.date || '-'}</div><div className="font-bold">Rec: {payment.receipt || 'N/A'}</div><div>Paid: ₹{payment.amount || 0}</div>{groupMembers.length > 1 && <button type="button" onClick={(e) => { e.stopPropagation(); openPaymentModal([student], month, settings.globalBaseFee); }} className="mt-1 w-full rounded bg-yellow-100 px-1 py-0.5 text-[9px] font-black text-yellow-900 hover:bg-yellow-200">Separate</button>}{balance > 0 && <div className="text-red-700 font-black">Bal: ₹{balance}</div>}</div>}</div></td>);
                     i++;
                 }
                 return cells;
@@ -776,7 +774,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                             <Icons.Search />
                             <input type="text" placeholder="Search..." className="w-full px-3 py-1.5 border rounded focus:ring-green-500 outline-none text-sm" value={search} onChange={e => setSearch(e.target.value)} />
                         </div>
-                        
+
                         <div className="flex flex-wrap items-center gap-2">
                             <select className="px-2 py-1.5 border rounded text-sm bg-white" value={classFilter} onChange={e => setClassFilter(e.target.value)}>
                                 <option value="">Filter: All Classes</option>
@@ -846,7 +844,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                         const isGroup = student.isGroupedDisplay || groupMembers.length > 1;
                                         const actualFee = student.groupFee || (groupMembers.length * settings.globalBaseFee);
                                         const hasConcession = student.groupFee !== null && student.groupFee !== (groupMembers.length * settings.globalBaseFee);
-                                        
+
                                         // Calculate Extra Fees Due
                                         const appExtraFees = settings.extraFees?.filter(f => feeAppliesToStudent(f, student.studentClass)) || [];
                                         const totalExFee = appExtraFees.reduce((sum, f) => sum + feeAmountForStudent(f, student.studentClass), 0);
@@ -859,7 +857,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                                 <td className="px-3 py-2 font-bold align-top border-r">
                                                     <div className="space-y-1">{groupMembers.map((member) => <div key={member.id} className={member.id === student.id ? 'text-gray-900' : 'text-gray-600'}>{member.studentClass}</div>)}</div>
                                                 </td>
-                                                
+
                                                 <td className="px-3 py-2 align-top border-r">
                                                     <div className="space-y-1">
                                                         {groupMembers.map((member, memberIdx) => <div key={member.id} className="flex items-center">
@@ -877,7 +875,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                                         <span className="text-[11px] text-gray-500 font-medium tracking-wide mt-0.5">{student.phone || '-'}</span>
                                                     </div>
                                                 </td>
-                                                
+
                                                 <td className="px-2 py-2 border-r text-center bg-yellow-50/20">
                                                     <button onClick={() => { setSelectedFamilyStudent(student); setGroupOnlyMode(true); setFamilyModalOpen(true); }} className={`w-full flex items-center justify-center px-1 py-1 bg-white border rounded font-bold shadow-sm transition-all text-[11px] tracking-wide ${hasConcession ? 'border-yellow-400 text-yellow-900 bg-yellow-50' : 'border-gray-200 text-gray-700 hover:border-yellow-300'}`}>
                                                         {isGroup && <Icons.Link />} ₹{actualFee} {isGroup ? `(${groupMembers.length})` : ''}
@@ -890,7 +888,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                                         <span className={dueExFee > 0 ? 'text-red-600' : 'text-green-600'}>{dueExFee > 0 ? `Balance: ₹${dueExFee}` : 'Balance: ₹0'}</span>
                                                     </button>
                                                 </td>
-                                                
+
                                                 <td className={`px-3 py-2 text-right font-bold border-r ${student.pendingArrears > 0 ? 'text-red-600 bg-red-50/50' : 'text-gray-300'}`}>
                                                     {student.pendingArrears > 0 ? `₹${student.pendingArrears}` : '0'}
                                                 </td>
@@ -938,7 +936,7 @@ const { useState, useEffect, useMemo, useRef } = React;
         const StudentProfileModal = ({ student, onClose, onEdit, showAlert }) => {
             if (!student) return null;
             const prof = student.profile || {};
-            
+
             return (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[80] p-4">
                     <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden">
@@ -981,12 +979,12 @@ const { useState, useEffect, useMemo, useRef } = React;
             const [members, setMembers] = useState([]);
             const [searchClass, setSearchClass] = useState('');
             const [searchName, setSearchName] = useState('');
-            
+
             const [groupFee, setGroupFee] = useState('');
             const [guardian, setGuardian] = useState('');
             const [phone, setPhone] = useState('');
             const [pendingArrears, setPendingArrears] = useState('');
-            
+
             const [stName, setStName] = useState('');
             const [stClass, setStClass] = useState('');
             const [stGender, setStGender] = useState('');
@@ -1006,7 +1004,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                 setMembers(grp);
                 setGroupFee(grp[0]?.groupFee || ''); setGuardian(grp[0]?.guardian || '');
                 setPhone(grp[0]?.phone || ''); setPendingArrears(grp[0]?.pendingArrears || 0);
-                
+
                 const p = grp.find(s => s.id === primaryStudent.id);
                 if(p) {
                     setStName(p.name || ''); setStClass(p.studentClass || ''); setStGender(p.gender || 'M');
@@ -1072,7 +1070,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                 const originalMembers = allStudents.filter(s => s.groupId === primaryStudent.groupId);
                 originalMembers.forEach(om => {
                     if (!members.find(m => m.id === om.id)) {
-                        batch.update(db.collection('students').doc(om.id), { groupId: om.id, groupFee: null }); 
+                        batch.update(db.collection('students').doc(om.id), { groupId: om.id, groupFee: null });
                     }
                 });
 
@@ -1085,8 +1083,8 @@ const { useState, useEffect, useMemo, useRef } = React;
                 onClose();
             };
 
-            const searchResults = allStudents.filter(s => 
-                s.id !== primaryStudent.id && s.studentClass === searchClass && 
+            const searchResults = allStudents.filter(s =>
+                s.id !== primaryStudent.id && s.studentClass === searchClass &&
                 (s.name || '').toLowerCase().includes(searchName.toLowerCase()) &&
                 !members.find(m => m.id === s.id)
             );
@@ -1100,7 +1098,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                             <h3 className="text-base sm:text-lg font-bold flex items-center min-w-0 pr-3"><Icons.Link /> <span className="truncate">{groupOnly ? 'Group Setup & Concession' : 'Add / Edit Student Details'}</span></h3>
                             <button onClick={onClose} className="hover:text-gray-200 shrink-0"><Icons.Close /></button>
                         </div>
-                        
+
                         <div className="flex-1 overflow-y-auto p-3 sm:p-4 flex flex-col lg:flex-row gap-3 sm:gap-4">
                             {!groupOnly && <div className="flex-1 lg:w-3/5 space-y-3 sm:space-y-4">
                                 <div className="bg-white p-4 sm:p-5 rounded-lg shadow-sm border border-gray-200">
@@ -1109,13 +1107,13 @@ const { useState, useEffect, useMemo, useRef } = React;
                                         <div className="sm:col-span-2"><label className="text-xs font-bold text-gray-500 mb-1 block">Full Name *</label><input type="text" className="w-full p-2.5 border rounded font-bold uppercase focus:ring-2 focus:ring-blue-400 outline-none" value={stName} onChange={e => setStName(e.target.value)} required /></div>
                                         <div><label className="text-xs font-bold text-gray-500 mb-1 block">Class *</label><select className="w-full p-2.5 border rounded bg-white focus:ring-2 focus:ring-blue-400 outline-none" value={stClass} onChange={e => setStClass(e.target.value)}>{CLASSES.map(c => <option key={c}>{c}</option>)}</select></div>
                                         <div><label className="text-xs font-bold text-gray-500 mb-1 block">Gender *</label><select className="w-full p-2.5 border rounded bg-white focus:ring-2 focus:ring-blue-400 outline-none" value={stGender} onChange={e => setStGender(e.target.value)}><option value="M">Male</option><option value="F">Female</option></select></div>
-                                        
+
                                         <div><label className="text-xs font-bold text-gray-500 mb-1 block">Admission No.</label><input type="text" className="w-full p-2 border rounded outline-none" value={stAdmNo} onChange={e => setStAdmNo(e.target.value)} /></div>
                                         <div><label className="text-xs font-bold text-gray-500 mb-1 block">Date of Admission</label><input type="date" className="w-full p-2 border rounded outline-none text-sm" value={stAdmDate} onChange={e => setStAdmDate(e.target.value)} /></div>
-                                        
+
                                         <div><label className="text-xs font-bold text-gray-500 mb-1 block">Date of Birth</label><input type="date" className="w-full p-2 border rounded outline-none text-sm" value={stDob} onChange={e => setStDob(e.target.value)} /></div>
                                         <div><label className="text-xs font-bold text-gray-500 mb-1 block">Aadhaar No.</label><input type="text" className="w-full p-2 border rounded outline-none" value={stAdhaar} onChange={e => setStAdhaar(e.target.value)} /></div>
-                                        
+
                                         <div className="sm:col-span-2"><label className="text-xs font-bold text-gray-500 mb-1 block">Permanent Address</label><textarea rows="2" className="w-full p-2 border rounded outline-none" value={stAddress} onChange={e => setStAddress(e.target.value)}></textarea></div>
                                         <div className="sm:col-span-2"><label className="text-xs font-bold text-gray-500 mb-1 block">Samastha Online ID</label><input type="text" className="w-full p-2 border rounded outline-none" value={stSamasthaId} onChange={e => setStSamasthaId(e.target.value)} /></div>
                                     </div>
@@ -1145,15 +1143,15 @@ const { useState, useEffect, useMemo, useRef } = React;
                                     <h4 className="font-bold text-blue-800 mb-3 border-b pb-2 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
                                         <span>3. Link Siblings (Manual)</span><span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full self-start sm:self-auto">{members.length} Selected</span>
                                     </h4>
-                                    
+
                                     <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-2 mb-3 bg-blue-50 p-2 rounded border border-blue-100">
                                         <select className="p-2 border rounded text-xs w-full outline-none" value={searchClass} onChange={e => setSearchClass(e.target.value)}><option value="">Class</option>{CLASSES.map(c => <option key={c} value={c}>{c}</option>)}</select>
                                         <input type="text" placeholder="Search to add..." className="p-2 border rounded text-xs w-full outline-none" value={searchName} onChange={e => setSearchName(e.target.value)} />
                                     </div>
-                                    
+
                                     {searchName && searchClass && (
                                         <div className="mb-3 border border-green-200 rounded max-h-24 overflow-y-auto bg-green-50 shadow-inner">
-                                            {searchResults.length === 0 ? <div className="p-2 text-xs text-gray-500 text-center">No unlinked matches found.</div> : 
+                                            {searchResults.length === 0 ? <div className="p-2 text-xs text-gray-500 text-center">No unlinked matches found.</div> :
                                                 searchResults.map(s => (
                                                     <div key={s.id} className="flex justify-between items-center gap-2 p-2 border-b hover:bg-green-100">
                                                         <span className="text-xs font-bold truncate min-w-0">{s.name}</span>
@@ -1163,7 +1161,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                             }
                                         </div>
                                     )}
-                                    
+
                                     <div className="space-y-2 overflow-y-auto flex-1 pr-1 min-h-[140px]">
                                         {members.map(m => (
                                             <div key={m.id} className={`flex justify-between items-center gap-2 p-2 rounded border ${m.id === primaryStudent.id ? 'bg-yellow-50 border-yellow-400' : 'bg-gray-50 border-gray-200'}`}>
@@ -1186,18 +1184,18 @@ const { useState, useEffect, useMemo, useRef } = React;
                     </div>
 
                     {/* Nested Confirms */}
-                    <CustomConfirm 
-                        isOpen={!!conflictStudent} 
-                        title="Conflict Detected" 
-                        message={`Primary Phone: ${phone}\nSibling Phone: ${conflictStudent?.phone}\n\nDo you want to overwrite and keep the Primary Phone for all members?`} 
-                        confirmText="Keep Primary" onConfirm={() => proceedAddSibling(conflictStudent, true)} 
-                        onCancel={() => proceedAddSibling(conflictStudent, false)} 
+                    <CustomConfirm
+                        isOpen={!!conflictStudent}
+                        title="Conflict Detected"
+                        message={`Primary Phone: ${phone}\nSibling Phone: ${conflictStudent?.phone}\n\nDo you want to overwrite and keep the Primary Phone for all members?`}
+                        confirmText="Keep Primary" onConfirm={() => proceedAddSibling(conflictStudent, true)}
+                        onCancel={() => proceedAddSibling(conflictStudent, false)}
                         type="info"
                     />
-                    <CustomConfirm 
-                        isOpen={confirmDeleteOpen} title="Delete Student" 
-                        message="Permanently delete this student record? All payment history will be lost. This cannot be undone." 
-                        confirmText="Yes, Delete" onConfirm={executeDelete} onCancel={() => setConfirmDeleteOpen(false)} 
+                    <CustomConfirm
+                        isOpen={confirmDeleteOpen} title="Delete Student"
+                        message="Permanently delete this student record? All payment history will be lost. This cannot be undone."
+                        confirmText="Yes, Delete" onConfirm={executeDelete} onCancel={() => setConfirmDeleteOpen(false)}
                     />
                 </div>
             );
@@ -1220,6 +1218,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                 const paidAmount = parseInt(amount);
                 if (!receipt.trim()) return showAlert('Receipt number is required for multi-entry payment.', 'Missing Receipt');
                 if (isNaN(paidAmount) || paidAmount <= 0) return showAlert('Valid amount is required.', 'Invalid Amount');
+                if (paidAmount > totalDue) return showAlert(`Amount cannot be greater than selected total ₹${totalDue}.`, 'Over Payment Not Allowed');
                 const batchId = 'BATCH_' + Date.now();
                 let remaining = paidAmount;
                 const batch = db.batch();
@@ -1279,7 +1278,6 @@ const { useState, useEffect, useMemo, useRef } = React;
             const { members, month, groupFee, existingPayment } = context;
             const previousPaid = parseInt(existingPayment?.amount || 0);
             const previousBalance = Math.max(0, groupFee - previousPaid);
-            const previousCredit = Math.max(0, previousPaid - groupFee);
             const existingEntries = existingPayment?.entries || (existingPayment ? [{
                 amount: previousPaid,
                 receipt: existingPayment.receipt || '',
@@ -1295,14 +1293,15 @@ const { useState, useEffect, useMemo, useRef } = React;
                 e.preventDefault();
                 const paidAmount = parseInt(amount);
                 if (isNaN(paidAmount) || paidAmount <= 0) return showAlert("Valid amount is required", "Invalid Amount");
+                if (paidAmount > previousBalance) return showAlert(`Amount cannot be greater than balance ₹${previousBalance}.`, "Over Payment Not Allowed");
 
                 const entry = { amount: paidAmount, receipt: receipt.trim().toUpperCase(), date: payDate, timestamp: new Date().toISOString() };
                 const totalPaid = previousPaid + paidAmount;
                 const balance = Math.max(0, groupFee - totalPaid);
-                const credit = Math.max(0, totalPaid - groupFee);
+                const credit = 0;
                 const previousTrackedBalance = existingPayment ? Math.max(0, groupFee - previousPaid) : 0;
                 const arrearsDelta = balance - previousTrackedBalance;
-                const status = balance > 0 ? 'PARTIAL' : (credit > 0 ? 'CREDIT' : 'FULL');
+                const status = balance > 0 ? 'PARTIAL' : 'FULL';
 
                 const paymentData = {
                     amount: totalPaid,
@@ -1350,15 +1349,15 @@ const { useState, useEffect, useMemo, useRef } = React;
                                     <p className="flex justify-between"><span>Due Amount:</span> <span>₹{groupFee}</span></p>
                                     <p className="flex justify-between"><span>Already Paid:</span> <span>₹{previousPaid}</span></p>
                                     <p className="flex justify-between text-red-700"><span>Balance:</span> <span>₹{previousBalance}</span></p>
-                                    {previousCredit > 0 && <p className="flex justify-between text-blue-700"><span>Advance/Credit:</span> <span>₹{previousCredit}</span></p>}
+
                                 </div>
                             </div>
                             {existingEntries.length > 0 && <div className="border rounded max-h-28 overflow-y-auto text-xs"><div className="bg-gray-100 px-2 py-1 font-black">Payment Entries</div>{existingEntries.map((entry, i) => <div key={`${entry.timestamp}_${i}`} className="flex justify-between px-2 py-1 border-t"><span>{entry.date || '-'} • {entry.receipt || 'N/A'}</span><span className="font-bold">₹{entry.amount || 0}</span></div>)}</div>}
-                            
+
                             <div><label className="block text-sm font-bold text-gray-700 mb-1">Date of Payment</label><input type="date" required className="w-full px-4 py-2 border rounded-md font-bold text-gray-800 outline-none focus:ring-2 focus:ring-green-500" value={payDate} onChange={e => setPayDate(e.target.value)} /></div>
                             <div><label className="block text-sm font-bold text-gray-700 mb-1">New Amount Paid (₹)</label><input type="number" required min="1" className="w-full px-4 py-3 border rounded-md text-2xl font-bold outline-none focus:ring-2 focus:ring-green-500" value={amount} onChange={e => setAmount(e.target.value)} /></div>
                             <div><label className="block text-sm font-bold text-gray-700 mb-1">Receipt No (Optional)</label><input type="text" className="w-full px-4 py-2 border rounded-md uppercase font-bold outline-none focus:ring-2 focus:ring-green-500" value={receipt} onChange={e => setReceipt(e.target.value)} /></div>
-                            
+
                             <div className="pt-4 flex justify-between mt-6">
                                 {existingPayment ? <button type="button" onClick={() => setConfirmDel(true)} className="text-red-600 font-bold px-3 py-2 border border-transparent hover:border-red-200 rounded">Delete Record</button> : <div></div>}
                                 <div className="space-x-3"><button type="button" onClick={onClose} className="px-4 py-2 font-bold text-gray-600 border rounded hover:bg-gray-50">Cancel</button><button type="submit" className="px-6 py-2 bg-green-600 text-white rounded-md font-bold shadow-md hover:bg-green-700">Add Entry</button></div>
@@ -1545,6 +1544,7 @@ const { useState, useEffect, useMemo, useRef } = React;
             const [logo, setLogo] = useState(settings.logo || '');
             const [extraFees, setExtraFees] = useState(settings.extraFees || []);
             const [receiptRequired, setReceiptRequired] = useState(settings.receiptRequired !== false);
+            const [nextReceiptInput, setNextReceiptInput] = useState(settings.lastReceiptNumber || '');
             const [saving, setSaving] = useState(false);
 
             const [newFeeName, setNewFeeName] = useState('');
@@ -1557,6 +1557,7 @@ const { useState, useEffect, useMemo, useRef } = React;
 
             useEffect(() => { setExtraFees(settings.extraFees || []); }, [settings.extraFees]);
             useEffect(() => { setReceiptRequired(settings.receiptRequired !== false); }, [settings.receiptRequired]);
+            useEffect(() => { setNextReceiptInput(settings.lastReceiptNumber || ''); }, [settings.lastReceiptNumber]);
 
             const resetFeeForm = () => {
                 setNewFeeName(''); setNewFeeAmount(''); setNewFeeMode('ALL'); setNewFeeClass('+2'); setEditingFeeId(null); setEditFeeModalOpen(false); setClassAmounts(Object.fromEntries(CLASSES.map(c => [c, ''])));
@@ -1634,9 +1635,9 @@ const { useState, useEffect, useMemo, useRef } = React;
 
             const handleSave = async (e) => {
                 e.preventDefault(); setSaving(true);
-                await db.collection('settings').doc('global').set({ 
+                await db.collection('settings').doc('global').set({
                     globalBaseFee: parseInt(baseFee), academicStartMonth: startMonth, academicEndMonth: endMonth,
-                    institutionName: institutionName.trim(), institutionPlace: institutionPlace.trim(), registerNumber: registerNumber.trim(), logo: logo.trim(), extraFees, receiptRequired
+                    institutionName: institutionName.trim(), institutionPlace: institutionPlace.trim(), registerNumber: registerNumber.trim(), logo: logo.trim(), extraFees, receiptRequired, lastReceiptNumber: nextReceiptInput.trim()
                 }, { merge: true });
                 setSaving(false); showAlert("Settings updated successfully!", "Success");
             };
@@ -1660,7 +1661,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                 </div>
                                 {logo && <div className="flex items-center gap-3"><img src={logo} className="w-20 h-20 rounded-full object-cover border" /><button type="button" onClick={() => setLogo('')} className="px-3 py-1.5 rounded border border-red-200 text-red-600 text-xs font-bold hover:bg-red-50">Remove Logo</button></div>}
                                 <div><label className="block text-sm font-bold mb-1 text-gray-700">Default Base Fee (₹)</label><input type="number" required min="0" className="w-full px-4 py-2 border rounded-md text-lg font-bold outline-none" value={baseFee} onChange={e => setBaseFee(e.target.value)} /></div>
-                                <div className="p-4 rounded-lg border bg-yellow-50 border-yellow-200 flex items-center justify-between gap-3"><div><div className="font-black text-yellow-900">Receipt Number Required</div><p className="text-xs text-yellow-700">ON ആണെങ്കിൽ fee entry save ചെയ്യാൻ receipt number നിർബന്ധമാണ്.</p></div><button type="button" onClick={() => setReceiptRequired(v => !v)} className={`w-16 h-8 rounded-full p-1 transition ${receiptRequired ? 'bg-green-600' : 'bg-gray-300'}`}><span className={`block w-6 h-6 bg-white rounded-full shadow transition ${receiptRequired ? 'translate-x-8' : ''}`}></span></button></div>
+                                <div className="p-4 rounded-lg border bg-yellow-50 border-yellow-200 space-y-3"><div className="flex items-center justify-between gap-3"><div><div className="font-black text-yellow-900">Receipt Number Required</div><p className="text-xs text-yellow-700">ON ആണെങ്കിൽ receipt number നിർബന്ധമാണ്; OFF ആണെങ്കിൽ fee entry receipt blank ആയിരിക്കും.</p></div><button type="button" onClick={() => setReceiptRequired(v => !v)} className={`w-16 h-8 rounded-full p-1 transition ${receiptRequired ? 'bg-green-600' : 'bg-gray-300'}`}><span className={`block w-6 h-6 bg-white rounded-full shadow transition ${receiptRequired ? 'translate-x-8' : ''}`}></span></button></div>{receiptRequired && <div><label className="block text-xs font-black text-yellow-900 mb-1">Next Receipt Number</label><input className="w-full px-3 py-2 border rounded font-black uppercase" value={nextReceiptInput} onChange={e => setNextReceiptInput(e.target.value)} placeholder="Enter next receipt number" /></div>}</div>
                                 <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg"><label className="block text-sm font-bold mb-3 text-blue-900">Academic Year Months</label><div className="grid grid-cols-2 gap-4"><select className="w-full p-2 border rounded bg-white" value={startMonth} onChange={e => setStartMonth(e.target.value)}>{ALL_MONTHS_BASE.map(m => <option key={m}>{m}</option>)}</select><select className="w-full p-2 border rounded bg-white" value={endMonth} onChange={e => setEndMonth(e.target.value)}>{ALL_MONTHS_BASE.map(m => <option key={m}>{m}</option>)}</select></div></div>
                             </div>
                             <button type="submit" disabled={saving} className="mt-6 w-full py-3 bg-green-600 hover:bg-green-700 rounded-md font-bold text-white shadow-md">{saving ? 'Saving...' : 'Save All Settings'}</button>
