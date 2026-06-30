@@ -134,11 +134,13 @@ const { useState, useEffect, useMemo, useRef } = React;
                             {settings.logo ? <img src={settings.logo} className="w-12 h-12 rounded-full bg-white object-cover border-2 border-white justify-self-end" /> : <div className="w-12 h-12 rounded-full bg-green-900 flex items-center justify-center font-black justify-self-end">MF</div>}
                         </div>
                         {menuOpen && <div className="absolute left-4 top-20 z-50 w-72 rounded-xl bg-white text-gray-800 shadow-2xl border overflow-hidden">
-                            {[['DASHBOARD','Dashboard',<Icons.Dashboard />],['STUDENTS','Student Management',<Icons.Users />],['CLASSES','Class Management',<Icons.Users />],['SETTINGS','Settings',<Icons.Settings />]].map(([key,label,icon]) => <button key={key} onClick={() => { setActiveTab(key); setMenuOpen(false); }} className={`w-full flex items-center px-5 py-4 font-bold hover:bg-green-50 ${activeTab === key ? 'bg-green-100 text-green-800' : ''}`}>{icon}{label}</button>)}
+                            {[['DASHBOARD','Dashboard',<Icons.Dashboard />],['FEE_ENTRY','Fee Entry',<Icons.PlusCircle />],['FEE_HISTORY','Fee History',<Icons.Check />],['STUDENTS','Student Management',<Icons.Users />],['CLASSES','Class Management',<Icons.Users />],['SETTINGS','Settings',<Icons.Settings />]].map(([key,label,icon]) => <button key={key} onClick={() => { setActiveTab(key); setMenuOpen(false); }} className={`w-full flex items-center px-5 py-4 font-bold hover:bg-green-50 ${activeTab === key ? 'bg-green-100 text-green-800' : ''}`}>{icon}{label}</button>)}
                         </div>}
                     </header>
                     <main className="flex-1 max-w-full w-full mx-auto p-4 sm:p-6 lg:p-8 bg-white shadow-inner">
                         {activeTab === 'DASHBOARD' && <DashboardTab students={students} settings={settings} dynamicMonths={dynamicMonths} />}
+                        {activeTab === 'FEE_ENTRY' && <FeeEntryTab students={students} settings={settings} dynamicMonths={dynamicMonths} showAlert={showAlert} />}
+                        {activeTab === 'FEE_HISTORY' && <FeeHistoryTab students={students} settings={settings} dynamicMonths={dynamicMonths} />}
                         {activeTab === 'STUDENTS' && <StudentTab students={students} settings={settings} dynamicMonths={dynamicMonths} showAlert={showAlert} />}
                         {activeTab === 'CLASSES' && <ClassManagementTab students={students} showAlert={showAlert} />}
                         {activeTab === 'SETTINGS' && <SettingsTab settings={settings} students={students} ALL_MONTHS_BASE={ALL_MONTHS_BASE} showAlert={showAlert} />}
@@ -208,6 +210,110 @@ const { useState, useEffect, useMemo, useRef } = React;
                 <div className="bg-white rounded-xl border shadow p-5"><h3 className="font-black text-gray-800 mb-4">Class Strength & Collection Table</h3><div className="overflow-x-auto"><table className="w-full text-sm border"><thead className="bg-gray-100"><tr><th className="p-2 border text-left">Class</th><th className="p-2 border text-center">Total</th><th className="p-2 border text-center">Boys</th><th className="p-2 border text-center">Girls</th><th className="p-2 border text-left">Strength Graph</th><th className="p-2 border text-right">Collected</th></tr></thead><tbody>{classRows.map(row => <tr key={row.cls} className="border-t"><td className="p-2 border font-black">{row.cls}</td><td className="p-2 border text-center font-bold">{row.count}</td><td className="p-2 border text-center text-blue-700 font-bold">{row.boys}</td><td className="p-2 border text-center text-pink-700 font-bold">{row.girls}</td><td className="p-2 border"><div className="flex items-center gap-2"><div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-green-600" style={{width: `${Math.max(4, row.percent)}%`}}></div></div><span className="text-xs font-bold text-gray-500">{row.percent}%</span></div></td><td className="p-2 border text-right font-bold">₹{row.collected}</td></tr>)}</tbody></table></div></div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4"><div className="bg-white rounded-xl border shadow p-5"><h4 className="font-black text-gray-800">Extra Fees</h4><p className="text-sm text-gray-500">Expected ₹{extraExpected} • Collected ₹{extraCollected}</p><div className="mt-3 h-3 bg-gray-100 rounded"><div className="h-3 bg-purple-600 rounded" style={{width: `${extraExpected ? Math.min(100,(extraCollected/extraExpected)*100) : 0}%`}}></div></div></div><div className="bg-white rounded-xl border shadow p-5"><h4 className="font-black text-gray-800">Pending Arrears</h4><div className="text-3xl font-black text-red-600">₹{arrears}</div><p className="text-sm text-gray-500">Student-wise carried balance</p></div><div className="bg-white rounded-xl border shadow p-5"><h4 className="font-black text-gray-800">Largest Class</h4><div className="text-3xl font-black text-green-700">{classRows.sort((a,b)=>b.count-a.count)[0]?.cls || '-'}</div><p className="text-sm text-gray-500">Highest current class strength</p></div></div>
             </div>;
+        };
+
+        const buildFeeHistoryRows = (students, settings, dynamicMonths) => {
+            const rows = [];
+            students.forEach(student => {
+                dynamicMonths.forEach(month => {
+                    const payment = student.payments?.[month];
+                    if (payment) rows.push({ id: `${student.id}_${month}`, date: payment.date || payment.timestamp?.slice(0, 10) || '-', receipt: payment.receipt || '-', studentName: student.name, studentClass: student.studentClass, type: `Monthly Fee - ${month}`, amount: parseInt(payment.lastAmount || payment.amount || 0), status: payment.status || 'PAID' });
+                });
+                (settings.extraFees || []).forEach(fee => {
+                    const payment = student.extraFeePayments?.[fee.id];
+                    if (payment) rows.push({ id: `${student.id}_${fee.id}`, date: payment.date || payment.timestamp?.slice(0, 10) || '-', receipt: payment.receipt || '-', studentName: student.name, studentClass: student.studentClass, type: fee.name || 'Extra Fee', amount: parseInt(payment.amount || 0), status: payment.balance > 0 ? 'PARTIAL' : 'PAID' });
+                });
+            });
+            return rows.sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.receipt).localeCompare(String(a.receipt)));
+        };
+
+        const FeeEntryTab = ({ students, settings, dynamicMonths, showAlert }) => {
+            const [studentClass, setStudentClass] = useState('');
+            const [gender, setGender] = useState('ALL');
+            const [query, setQuery] = useState('');
+            const [selectedStudent, setSelectedStudent] = useState(null);
+            const [selectedItems, setSelectedItems] = useState([]);
+            const [receipt, setReceipt] = useState(() => String(Date.now()).slice(-6));
+            const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
+            const [description, setDescription] = useState('');
+            const [saving, setSaving] = useState(false);
+
+            const filteredStudents = useMemo(() => students.filter(student =>
+                (!studentClass || student.studentClass === studentClass) &&
+                (gender === 'ALL' || student.gender === gender) &&
+                (!query || (student.name || '').toLowerCase().includes(query.toLowerCase()) || (student.profile?.admNo || '').toLowerCase().includes(query.toLowerCase()))
+            ).slice(0, 8), [students, studentClass, gender, query]);
+
+            const feeItems = useMemo(() => {
+                if (!selectedStudent) return [];
+                const monthlyAmount = selectedStudent.groupFee || settings.globalBaseFee || 0;
+                const monthly = dynamicMonths.map(month => ({ id: `MONTH_${month}`, type: 'MONTH', label: month, subtitle: 'Monthly Fee', amount: monthlyAmount, paid: !!selectedStudent.payments?.[month], paidInfo: selectedStudent.payments?.[month]?.receipt || selectedStudent.payments?.[month]?.amount || '', month }));
+                const extras = (settings.extraFees || []).filter(fee => feeAppliesToStudent(fee, selectedStudent.studentClass)).map(fee => ({ id: `EXTRA_${fee.id}`, type: 'EXTRA', label: fee.name || 'Extra Fee', subtitle: 'Extra Fee', amount: feeAmountForStudent(fee, selectedStudent.studentClass), paid: !!selectedStudent.extraFeePayments?.[fee.id], paidInfo: selectedStudent.extraFeePayments?.[fee.id]?.receipt || selectedStudent.extraFeePayments?.[fee.id]?.amount || '', fee }));
+                return [...monthly, ...extras];
+            }, [selectedStudent, settings, dynamicMonths]);
+
+            const totalAmount = selectedItems.reduce((sum, itemId) => sum + (feeItems.find(item => item.id === itemId)?.amount || 0), 0);
+
+            const resetStudent = () => { setSelectedStudent(null); setQuery(''); setSelectedItems([]); };
+            const selectStudent = (student) => { setSelectedStudent(student); setQuery(`${student.name} (${student.profile?.admNo || 'No Adm'})`); setSelectedItems([]); };
+            const toggleItem = (item) => {
+                if (item.paid) return;
+                setSelectedItems(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id]);
+            };
+
+            const handleSave = async () => {
+                if (!selectedStudent) return showAlert('Please select a student first.', 'Missing Student');
+                if (!selectedItems.length) return showAlert('Please select at least one unpaid fee item.', 'No Fee Selected');
+                if (!receipt.trim()) return showAlert('Receipt number is required.', 'Missing Receipt');
+                setSaving(true);
+                try {
+                    const updates = {};
+                    const nextPayments = { ...(selectedStudent.payments || {}) };
+                    const nextExtraFeePayments = { ...(selectedStudent.extraFeePayments || {}) };
+                    const now = new Date().toISOString();
+                    feeItems.filter(item => selectedItems.includes(item.id)).forEach(item => {
+                        if (item.type === 'MONTH') {
+                            const paymentData = { amount: item.amount, lastAmount: item.amount, status: 'FULL', receipt: receipt.trim().toUpperCase(), date: payDate, timestamp: now, entries: [{ amount: item.amount, receipt: receipt.trim().toUpperCase(), date: payDate, timestamp: now, description }], balance: 0, credit: 0, arrearsAdded: 0, isSharedFamilyPayment: false, groupId: selectedStudent.groupId || selectedStudent.id };
+                            updates[`payments.${item.month}`] = paymentData;
+                            nextPayments[item.month] = paymentData;
+                        } else {
+                            const extraPaymentData = { amount: item.amount, receipt: receipt.trim().toUpperCase(), date: payDate, timestamp: now, total: item.amount, balance: 0, description };
+                            updates[`extraFeePayments.${item.fee.id}`] = extraPaymentData;
+                            nextExtraFeePayments[item.fee.id] = extraPaymentData;
+                        }
+                    });
+                    await db.collection('students').doc(selectedStudent.id).update(updates);
+                    setSelectedStudent({ ...selectedStudent, payments: nextPayments, extraFeePayments: nextExtraFeePayments });
+                    showAlert(`Saved ${selectedItems.length} fee item(s). Total ₹${totalAmount}`, 'Fee Saved');
+                    setSelectedItems([]);
+                    setReceipt(String(Date.now()).slice(-6));
+                } catch (err) {
+                    console.error(err);
+                    showAlert('Fee entry could not be saved. Please try again.', 'Save Failed');
+                } finally {
+                    setSaving(false);
+                }
+            };
+
+            return <div className="max-w-5xl mx-auto space-y-5">
+                <div className="bg-white rounded-2xl border shadow p-5 sm:p-6"><div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b pb-4 mb-5"><div><h2 className="text-3xl font-black text-gray-800">Fee Entry</h2><p className="text-sm text-gray-500 font-medium">Select class, search student, choose unpaid fee items and save in one receipt.</p></div><div className="rounded-xl bg-green-50 border border-green-200 px-4 py-2 text-green-800 font-black">Total: ₹{totalAmount}</div></div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div><label className="text-sm font-bold text-gray-700">Class</label><select className="mt-1 w-full rounded-xl border p-3 text-lg outline-none focus:ring-2 focus:ring-green-500" value={studentClass} onChange={e => { setStudentClass(e.target.value); resetStudent(); }}><option value="">All Classes</option>{CLASSES.map(cls => <option key={cls} value={cls}>{cls}</option>)}</select></div>
+                        <div><label className="text-sm font-bold text-gray-700">Gender</label><select className="mt-1 w-full rounded-xl border p-3 text-lg outline-none focus:ring-2 focus:ring-green-500" value={gender} onChange={e => { setGender(e.target.value); resetStudent(); }}><option value="ALL">All</option><option value="M">Male</option><option value="F">Female</option></select></div>
+                        <div className="md:col-span-2 relative"><label className="text-sm font-bold text-gray-700">Student</label><div className="mt-1 flex rounded-xl border bg-white overflow-hidden focus-within:ring-2 focus-within:ring-green-500"><input className="flex-1 p-3 text-lg outline-none" placeholder="Search student name or admission no..." value={query} onChange={e => { setQuery(e.target.value); setSelectedStudent(null); setSelectedItems([]); }} />{query && <button onClick={resetStudent} className="px-4 text-gray-500 hover:bg-gray-100 font-black">×</button>}</div>{query && !selectedStudent && <div className="absolute z-30 mt-1 w-full bg-white border rounded-xl shadow-lg max-h-64 overflow-y-auto">{filteredStudents.length ? filteredStudents.map(student => <button key={student.id} onClick={() => selectStudent(student)} className="w-full text-left px-4 py-3 hover:bg-green-50 border-b"><span className="font-black text-gray-800">{student.name}</span><span className="ml-2 text-xs text-gray-500">Class {student.studentClass} • Adm: {student.profile?.admNo || '-'}</span></button>) : <div className="p-4 text-sm text-gray-500">No students found.</div>}</div>}</div>
+                        <div><label className="text-sm font-bold text-gray-700">Receipt No. <span className="text-red-500">*</span></label><input className="mt-1 w-full rounded-xl border p-3 text-lg font-black text-blue-700 outline-none focus:ring-2 focus:ring-green-500" value={receipt} onChange={e => setReceipt(e.target.value)} /></div>
+                        <div><label className="text-sm font-bold text-gray-700">Date</label><input type="date" className="mt-1 w-full rounded-xl border p-3 text-lg outline-none focus:ring-2 focus:ring-green-500" value={payDate} onChange={e => setPayDate(e.target.value)} /></div>
+                    </div>
+                    <div className="mt-6"><h3 className="font-black text-gray-800 mb-3">Fee Items</h3>{selectedStudent ? <div className="space-y-4"><div><div className="text-xs font-black text-blue-700 tracking-widest mb-2">MONTHLY FEES</div><div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">{feeItems.filter(item => item.type === 'MONTH').map(item => { const active = selectedItems.includes(item.id); return <button key={item.id} disabled={item.paid} onClick={() => toggleItem(item)} className={`rounded-xl border-2 p-3 min-h-[78px] text-center transition ${item.paid ? 'bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed' : active ? 'bg-green-50 border-green-500 text-green-800 shadow' : 'bg-red-50 border-red-300 text-red-800 hover:border-green-400'}`}><div className="font-black">{item.label}</div><div className="text-xs">₹{item.amount}</div>{item.paid && <div className="text-[10px] mt-1">Rcpt: {item.paidInfo}</div>}</button>; })}</div></div>{feeItems.some(item => item.type === 'EXTRA') && <div><div className="text-xs font-black text-purple-700 tracking-widest mb-2">EXTRA FEES</div><div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">{feeItems.filter(item => item.type === 'EXTRA').map(item => { const active = selectedItems.includes(item.id); return <button key={item.id} disabled={item.paid} onClick={() => toggleItem(item)} className={`rounded-xl border-2 p-3 min-h-[78px] text-center transition ${item.paid ? 'bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed' : active ? 'bg-green-50 border-green-500 text-green-800 shadow' : 'bg-red-50 border-red-300 text-red-800 hover:border-green-400'}`}><div className="font-black">{item.label}</div><div className="text-xs">₹{item.amount}</div>{item.paid && <div className="text-[10px] mt-1">Rcpt: {item.paidInfo}</div>}</button>; })}</div></div>}</div> : <div className="rounded-xl border border-dashed p-8 text-center text-gray-500 bg-gray-50">Select a student to show unpaid and paid fee items.</div>}</div>
+                    <div className="mt-6"><label className="text-sm font-bold text-gray-700">Description (Optional)</label><textarea rows="3" className="mt-1 w-full rounded-xl border p-3 outline-none focus:ring-2 focus:ring-green-500" value={description} onChange={e => setDescription(e.target.value)} /></div>
+                    <div className="mt-6 border-t pt-5"><label className="text-sm font-black text-gray-800">Total Amount (₹)</label><div className="mt-2 rounded-xl border p-4 text-center text-3xl font-black text-green-700">{totalAmount}</div><button onClick={handleSave} disabled={saving || !selectedItems.length} className="mt-4 w-full rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white py-4 text-2xl font-black shadow">{saving ? 'Saving...' : 'Save'}</button></div>
+                </div>
+            </div>;
+        };
+
+        const FeeHistoryTab = ({ students, settings, dynamicMonths }) => {
+            const rows = buildFeeHistoryRows(students, settings, dynamicMonths);
+            return <div className="space-y-5"><div className="bg-gradient-to-r from-blue-700 to-indigo-600 text-white rounded-2xl p-6 shadow"><h2 className="text-3xl font-black">Fee History</h2><p className="text-blue-100">Latest monthly and extra-fee entries saved in student records.</p></div><div className="bg-white rounded-xl border shadow overflow-hidden"><div className="overflow-x-auto"><table className="min-w-full text-sm"><thead className="bg-gray-100"><tr><th className="p-3 border text-left">Date</th><th className="p-3 border text-left">Receipt</th><th className="p-3 border text-left">Student</th><th className="p-3 border text-center">Class</th><th className="p-3 border text-left">Item</th><th className="p-3 border text-right">Amount</th><th className="p-3 border text-center">Status</th></tr></thead><tbody>{rows.length ? rows.map(row => <tr key={row.id} className="hover:bg-gray-50"><td className="p-3 border font-bold">{row.date}</td><td className="p-3 border font-black text-blue-700">{row.receipt}</td><td className="p-3 border font-bold">{row.studentName}</td><td className="p-3 border text-center">{row.studentClass}</td><td className="p-3 border">{row.type}</td><td className="p-3 border text-right font-black">₹{row.amount}</td><td className="p-3 border text-center"><span className="rounded-full bg-green-100 text-green-800 px-2 py-1 text-xs font-black">{row.status}</span></td></tr>) : <tr><td colSpan="7" className="p-8 text-center text-gray-500">No fee history yet.</td></tr>}</tbody></table></div></div></div>;
         };
 
         // --- STUDENTS TAB COMPONENT ---
