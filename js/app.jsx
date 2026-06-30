@@ -169,56 +169,85 @@ const { useState, useEffect, useMemo, useRef } = React;
         const feeAppliesToStudent = (fee, studentClass) => fee?.mode === 'ALL' || fee?.applyTo === 'ALL' || fee?.applyTo === studentClass || (fee?.mode === 'MULTI' && parseInt(fee.classAmounts?.[studentClass] || 0) > 0);
 
         const DashboardTab = ({ students, settings, dynamicMonths }) => {
+            const [detailView, setDetailView] = useState(null);
             const totalStudents = students.length;
+            const boysTotal = students.filter(s => s.gender === 'M').length;
+            const girlsTotal = students.filter(s => s.gender === 'F').length;
             const groupMap = students.reduce((acc, student) => {
                 const key = student.groupId || student.id;
                 if (!acc.has(key)) acc.set(key, []);
                 acc.get(key).push(student);
                 return acc;
             }, new Map());
-            const groups = groupMap.size;
             const groupRows = Array.from(groupMap.entries()).map(([groupId, members]) => {
                 const groupFee = members[0]?.groupFee || (members.length * settings.globalBaseFee);
-                const expected = groupFee * dynamicMonths.length;
-                const collected = dynamicMonths.reduce((sum, month) => sum + parseInt(members[0]?.payments?.[month]?.amount || 0), 0);
-                return { groupId, members, groupFee, expected, collected, balance: Math.max(0, expected - collected) };
+                return { groupId, members, groupFee };
             });
-            const monthlyExpected = groupRows.reduce((sum, group) => sum + group.expected, 0);
-            const monthlyCollected = groupRows.reduce((sum, group) => sum + group.collected, 0);
+            const groupMonthCollected = (group, month) => {
+                const sharedPayment = group.members.find(member => member.payments?.[month]?.isSharedFamilyPayment)?.payments?.[month];
+                if (sharedPayment) return parseInt(sharedPayment.amount || 0);
+                return group.members.reduce((sum, member) => sum + parseInt(member.payments?.[month]?.amount || 0), 0);
+            };
+            const monthlyRows = dynamicMonths.map(month => {
+                const expected = groupRows.reduce((sum, group) => sum + group.groupFee, 0);
+                const collected = groupRows.reduce((sum, group) => sum + groupMonthCollected(group, month), 0);
+                return { month, expected, collected, balance: Math.max(0, expected - collected) };
+            });
+            const monthlyExpected = monthlyRows.reduce((sum, row) => sum + row.expected, 0);
+            const monthlyCollected = monthlyRows.reduce((sum, row) => sum + row.collected, 0);
             const monthlyBalance = Math.max(0, monthlyExpected - monthlyCollected);
-            const extraExpected = students.reduce((sum, student) => sum + (settings.extraFees || []).filter(fee => feeAppliesToStudent(fee, student.studentClass)).reduce((feeSum, fee) => feeSum + feeAmountForStudent(fee, student.studentClass), 0), 0);
-            const extraCollected = students.reduce((sum, s) => sum + Object.values(s.extraFeePayments || {}).reduce((a, p) => a + parseInt(p.amount || 0), 0), 0);
+            const extraStudentRows = students.map(student => {
+                const expected = (settings.extraFees || []).filter(fee => feeAppliesToStudent(fee, student.studentClass)).reduce((feeSum, fee) => feeSum + feeAmountForStudent(fee, student.studentClass), 0);
+                const collected = Object.values(student.extraFeePayments || {}).reduce((sum, payment) => sum + parseInt(payment.amount || 0), 0);
+                return { student, expected, collected, balance: Math.max(0, expected - collected) };
+            });
+            const extraExpected = extraStudentRows.reduce((sum, row) => sum + row.expected, 0);
+            const extraCollected = extraStudentRows.reduce((sum, row) => sum + row.collected, 0);
             const extraBalance = Math.max(0, extraExpected - extraCollected);
-            const arrears = students.reduce((sum, s) => sum + parseInt(s.pendingArrears || 0), 0);
-            const paidCells = groupRows.reduce((sum, group) => sum + dynamicMonths.filter(month => group.members[0]?.payments?.[month]).length, 0);
-            const totalCells = groups * dynamicMonths.length;
-            const completion = totalCells ? Math.round((paidCells / totalCells) * 100) : 0;
-            const collectionRate = monthlyExpected ? Math.round((monthlyCollected / monthlyExpected) * 100) : 0;
-            const boysTotal = students.filter(s => s.gender === 'M').length;
-            const girlsTotal = students.filter(s => s.gender === 'F').length;
+            const arrearStudentRows = students.map(student => ({ student, balance: parseInt(student.pendingArrears || 0) })).filter(row => row.balance > 0);
+            const arrears = arrearStudentRows.reduce((sum, row) => sum + row.balance, 0);
             const classRows = CLASSES.map(cls => {
                 const classStudents = students.filter(s => s.studentClass === cls);
                 const boys = classStudents.filter(s => s.gender === 'M').length;
                 const girls = classStudents.filter(s => s.gender === 'F').length;
-                const collected = groupRows.reduce((sum, group) => sum + group.members.filter(member => member.studentClass === cls).reduce((inner, member) => inner + dynamicMonths.reduce((monthSum, month) => monthSum + parseInt(member.payments?.[month]?.amount || 0), 0), 0), 0);
-                return { cls, count: classStudents.length, boys, girls, collected, percent: totalStudents ? Math.round((classStudents.length / totalStudents) * 100) : 0 };
+                const classGroups = groupRows.filter(group => group.members.some(member => member.studentClass === cls));
+                const expected = classGroups.reduce((sum, group) => {
+                    const classMemberCount = group.members.filter(member => member.studentClass === cls).length;
+                    const share = group.members.length ? group.groupFee * (classMemberCount / group.members.length) : 0;
+                    return sum + (share * dynamicMonths.length);
+                }, 0);
+                const collected = classGroups.reduce((sum, group) => sum + dynamicMonths.reduce((monthSum, month) => {
+                    const classMemberCount = group.members.filter(member => member.studentClass === cls).length;
+                    const share = group.members.length ? groupMonthCollected(group, month) * (classMemberCount / group.members.length) : 0;
+                    return monthSum + share;
+                }, 0), 0);
+                const extra = extraStudentRows.filter(row => row.student.studentClass === cls).reduce((sum, row) => sum + row.balance, 0);
+                const arrear = arrearStudentRows.filter(row => row.student.studentClass === cls).reduce((sum, row) => sum + row.balance, 0);
+                return { cls, count: classStudents.length, boys, girls, expected: Math.round(expected), collected: Math.round(collected), balance: Math.max(0, Math.round(expected - collected)), extra, arrear };
+            }).filter(row => row.count || row.expected || row.extra || row.arrear);
+            const detailRows = detailView?.type === 'extra' ? extraStudentRows.filter(row => row.balance > 0) : detailView?.type === 'arrears' ? arrearStudentRows : [];
+            const detailClassRows = CLASSES.map(cls => {
+                const rows = detailRows.filter(row => row.student.studentClass === cls);
+                return { cls, count: rows.length, total: rows.reduce((sum, row) => sum + row.balance, 0), rows };
             }).filter(row => row.count);
+            const selectedDetailClass = detailView?.className ? detailClassRows.find(row => row.cls === detailView.className) : null;
             const statCards = [
                 [totalStudents, 'Total Students', 'bg-blue-600'],
-                [groups, 'Fee Groups', 'bg-yellow-600'],
-                [`${collectionRate}%`, 'Monthly Collection Rate', 'bg-green-600'],
-                [`₹${monthlyBalance}`, 'Monthly Balance', 'bg-red-600'],
-                [`₹${extraBalance}`, 'Extra Fee Balance', 'bg-purple-600']
+                [groupRows.length, 'Fee Groups', 'bg-yellow-600'],
+                [`₹${monthlyExpected}`, 'Monthly Demand', 'bg-green-600'],
+                [`₹${monthlyCollected}`, 'Monthly Collected', 'bg-emerald-600'],
+                [`₹${monthlyBalance}`, 'Monthly Pending', 'bg-red-600']
             ];
             return <div className="space-y-6">
-                <div className="bg-gradient-to-r from-green-700 to-emerald-600 text-white rounded-2xl p-6 shadow-lg"><h2 className="text-2xl font-black">Dashboard</h2><p className="text-green-100">Complete student strength, monthly fee targets, collections, balances and class-wise breakdown.</p></div>
+                <div className="bg-gradient-to-r from-green-700 to-emerald-600 text-white rounded-2xl p-6 shadow-lg"><h2 className="text-2xl font-black">Dashboard</h2><p className="text-green-100">Month-wise fee demand, collected amount, pending amount, class strength and fee balance details.</p></div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">{statCards.map(([v,l,c]) => <div key={l} className={`${c} text-white rounded-xl p-5 shadow`}><div className="text-3xl font-black">{v}</div><div className="text-sm opacity-90 font-bold">{l}</div></div>)}</div>
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="lg:col-span-2 bg-white rounded-xl border shadow p-5"><h3 className="font-black text-gray-800 mb-4">Fee Collection Breakdown</h3><div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">{[[monthlyExpected,'Total Monthly Demand'],[monthlyCollected,'Total Monthly Collected'],[monthlyBalance,'Total Monthly Pending']].map(([v,l]) => <div key={l} className="rounded-lg border bg-gray-50 p-3"><div className="text-xs font-bold text-gray-500 uppercase">{l}</div><div className="text-2xl font-black text-gray-900">₹{v}</div></div>)}</div><div className="h-4 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-green-600" style={{width: `${Math.min(100, collectionRate)}%`}}></div></div><div className="mt-2 text-sm font-bold text-gray-600">Collected {collectionRate}% • {paidCells}/{totalCells} month entries completed</div></div>
-                    <div className="bg-white rounded-xl border shadow p-5"><h3 className="font-black text-gray-800 mb-4">Student Mix</h3><div className="grid grid-cols-2 gap-3"><div className="rounded-xl bg-blue-50 border border-blue-100 p-4 text-center"><div className="text-3xl font-black text-blue-700">{boysTotal}</div><div className="text-xs font-bold text-blue-600">Boys</div></div><div className="rounded-xl bg-pink-50 border border-pink-100 p-4 text-center"><div className="text-3xl font-black text-pink-700">{girlsTotal}</div><div className="text-xs font-bold text-pink-600">Girls</div></div></div><div className="mt-4"><div className="text-5xl font-black text-green-700">{completion}%</div><p className="text-sm text-gray-500">Overall fee completion</p></div></div>
+                    <div className="lg:col-span-2 bg-white rounded-xl border shadow p-5"><h3 className="font-black text-gray-800 mb-4">Month-wise Fee Collection</h3><div className="overflow-x-auto"><table className="w-full text-sm border"><thead className="bg-gray-100"><tr><th className="p-2 border text-left">Month</th><th className="p-2 border text-right">Need to Collect</th><th className="p-2 border text-right">Collected</th><th className="p-2 border text-right">Pending</th></tr></thead><tbody>{monthlyRows.map(row => <tr key={row.month}><td className="p-2 border font-black">{row.month}</td><td className="p-2 border text-right font-bold">₹{row.expected}</td><td className="p-2 border text-right font-bold text-green-700">₹{row.collected}</td><td className="p-2 border text-right font-bold text-red-600">₹{row.balance}</td></tr>)}</tbody><tfoot className="bg-gray-50 font-black"><tr><td className="p-2 border">Total</td><td className="p-2 border text-right">₹{monthlyExpected}</td><td className="p-2 border text-right text-green-700">₹{monthlyCollected}</td><td className="p-2 border text-right text-red-600">₹{monthlyBalance}</td></tr></tfoot></table></div></div>
+                    <div className="bg-white rounded-xl border shadow p-5"><h3 className="font-black text-gray-800 mb-4">Student Mix</h3><div className="grid grid-cols-1 gap-3"><div className="rounded-xl bg-gray-50 border p-4 text-center"><div className="text-4xl font-black text-gray-800">{totalStudents}</div><div className="text-xs font-bold text-gray-500">Total Students</div></div><div className="grid grid-cols-2 gap-3"><div className="rounded-xl bg-blue-50 border border-blue-100 p-4 text-center"><div className="text-3xl font-black text-blue-700">{boysTotal}</div><div className="text-xs font-bold text-blue-600">Boys</div></div><div className="rounded-xl bg-pink-50 border border-pink-100 p-4 text-center"><div className="text-3xl font-black text-pink-700">{girlsTotal}</div><div className="text-xs font-bold text-pink-600">Girls</div></div></div></div><div className="mt-4 rounded-lg bg-green-50 border border-green-100 p-3"><div className="text-xs font-black text-green-800 uppercase">All Months Total</div><div className="text-sm font-bold text-gray-700">Need ₹{monthlyExpected} • Got ₹{monthlyCollected} • Pending ₹{monthlyBalance}</div></div></div>
                 </div>
-                <div className="bg-white rounded-xl border shadow p-5"><h3 className="font-black text-gray-800 mb-4">Class Strength & Collection Table</h3><div className="overflow-x-auto"><table className="w-full text-sm border"><thead className="bg-gray-100"><tr><th className="p-2 border text-left">Class</th><th className="p-2 border text-center">Total</th><th className="p-2 border text-center">Boys</th><th className="p-2 border text-center">Girls</th><th className="p-2 border text-left">Strength Graph</th><th className="p-2 border text-right">Collected</th></tr></thead><tbody>{classRows.map(row => <tr key={row.cls} className="border-t"><td className="p-2 border font-black">{row.cls}</td><td className="p-2 border text-center font-bold">{row.count}</td><td className="p-2 border text-center text-blue-700 font-bold">{row.boys}</td><td className="p-2 border text-center text-pink-700 font-bold">{row.girls}</td><td className="p-2 border"><div className="flex items-center gap-2"><div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-green-600" style={{width: `${Math.max(4, row.percent)}%`}}></div></div><span className="text-xs font-bold text-gray-500">{row.percent}%</span></div></td><td className="p-2 border text-right font-bold">₹{row.collected}</td></tr>)}</tbody></table></div></div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4"><div className="bg-white rounded-xl border shadow p-5"><h4 className="font-black text-gray-800">Extra Fees</h4><p className="text-sm text-gray-500">Expected ₹{extraExpected} • Collected ₹{extraCollected}</p><div className="mt-3 h-3 bg-gray-100 rounded"><div className="h-3 bg-purple-600 rounded" style={{width: `${extraExpected ? Math.min(100,(extraCollected/extraExpected)*100) : 0}%`}}></div></div></div><div className="bg-white rounded-xl border shadow p-5"><h4 className="font-black text-gray-800">Pending Arrears</h4><div className="text-3xl font-black text-red-600">₹{arrears}</div><p className="text-sm text-gray-500">Student-wise carried balance</p></div><div className="bg-white rounded-xl border shadow p-5"><h4 className="font-black text-gray-800">Largest Class</h4><div className="text-3xl font-black text-green-700">{classRows.sort((a,b)=>b.count-a.count)[0]?.cls || '-'}</div><p className="text-sm text-gray-500">Highest current class strength</p></div></div>
+                <div className="bg-white rounded-xl border shadow p-5"><h3 className="font-black text-gray-800 mb-4">Class Strength & Collection Table</h3><div className="overflow-x-auto"><table className="w-full text-sm border"><thead className="bg-gray-100"><tr><th className="p-2 border text-left">Class</th><th className="p-2 border text-center">Total</th><th className="p-2 border text-center">Boys</th><th className="p-2 border text-center">Girls</th><th className="p-2 border text-right">Need to Collect</th><th className="p-2 border text-right">Collected</th><th className="p-2 border text-right">Pending</th></tr></thead><tbody>{classRows.map(row => <tr key={row.cls} className="border-t"><td className="p-2 border font-black">{row.cls}</td><td className="p-2 border text-center font-bold">{row.count}</td><td className="p-2 border text-center text-blue-700 font-bold">{row.boys}</td><td className="p-2 border text-center text-pink-700 font-bold">{row.girls}</td><td className="p-2 border text-right font-bold">₹{row.expected}</td><td className="p-2 border text-right font-bold text-green-700">₹{row.collected}</td><td className="p-2 border text-right font-bold text-red-600">₹{row.balance}</td></tr>)}</tbody></table></div></div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><button type="button" onClick={() => setDetailView({ type: 'extra', className: null })} className="text-left bg-white rounded-xl border shadow p-5 hover:border-purple-400 hover:shadow-md"><h4 className="font-black text-gray-800">Extra Fees Balance</h4><div className="mt-2 grid grid-cols-3 gap-2 text-sm"><div><div className="font-black">₹{extraExpected}</div><div className="text-gray-500 text-xs">Need</div></div><div><div className="font-black text-green-700">₹{extraCollected}</div><div className="text-gray-500 text-xs">Got</div></div><div><div className="font-black text-purple-700">₹{extraBalance}</div><div className="text-gray-500 text-xs">Balance</div></div></div><p className="mt-2 text-xs font-bold text-purple-700">Click to view class-wise and student-wise details.</p></button><button type="button" onClick={() => setDetailView({ type: 'arrears', className: null })} className="text-left bg-white rounded-xl border shadow p-5 hover:border-red-400 hover:shadow-md"><h4 className="font-black text-gray-800">Pending Arrears</h4><div className="mt-2 text-3xl font-black text-red-600">₹{arrears}</div><p className="mt-2 text-xs font-bold text-red-700">Click to view class-wise and student-wise arrears.</p></button></div>
+                {detailView && <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"><div className="px-5 py-4 border-b flex items-center justify-between"><div><h3 className="text-xl font-black text-gray-800">{detailView.type === 'extra' ? 'Extra Fees Balance Details' : 'Pending Arrears Details'}</h3><p className="text-xs text-gray-500 font-bold">Select a class to view students.</p></div><button onClick={() => setDetailView(null)} className="text-gray-500 hover:text-red-600"><Icons.Close /></button></div><div className="p-5 overflow-y-auto">{!selectedDetailClass ? <div className="overflow-x-auto"><table className="w-full text-sm border"><thead className="bg-gray-100"><tr><th className="p-2 border text-left">Class</th><th className="p-2 border text-center">Students</th><th className="p-2 border text-right">Amount</th><th className="p-2 border text-center">Action</th></tr></thead><tbody>{detailClassRows.length ? detailClassRows.map(row => <tr key={row.cls}><td className="p-2 border font-black">{row.cls}</td><td className="p-2 border text-center font-bold">{row.count}</td><td className="p-2 border text-right font-black">₹{row.total}</td><td className="p-2 border text-center"><button onClick={() => setDetailView({ ...detailView, className: row.cls })} className="px-3 py-1 rounded bg-green-700 text-white text-xs font-bold">View Students</button></td></tr>) : <tr><td colSpan="4" className="p-4 text-center text-gray-500 font-bold">No pending records.</td></tr>}</tbody></table></div> : <div><button onClick={() => setDetailView({ ...detailView, className: null })} className="mb-3 px-3 py-1.5 rounded bg-gray-100 text-gray-700 text-xs font-bold">← Back to Classes</button><div className="overflow-x-auto"><table className="w-full text-sm border"><thead className="bg-gray-100"><tr><th className="p-2 border text-left">Student</th><th className="p-2 border text-left">Guardian</th><th className="p-2 border text-left">Phone</th><th className="p-2 border text-right">Amount</th></tr></thead><tbody>{selectedDetailClass.rows.map(row => <tr key={row.student.id}><td className="p-2 border font-black">{row.student.name}</td><td className="p-2 border">{row.student.guardian || '-'}</td><td className="p-2 border">{row.student.phone || '-'}</td><td className="p-2 border text-right font-black">₹{row.balance}</td></tr>)}</tbody></table></div></div>}</div></div></div>}
             </div>;
         };
 
