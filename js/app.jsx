@@ -29,7 +29,7 @@ const { useState, useEffect, useMemo, useRef } = React;
         const CustomConfirm = ({ isOpen, title = "Confirm", message, onConfirm, onCancel, confirmText = "Confirm", type = "danger" }) => {
             if (!isOpen) return null;
             return (
-                <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
+                <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[300] p-4 backdrop-blur-sm">
                     <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 transform transition-all">
                         <h3 className={`text-lg font-bold mb-2 ${type === 'danger' ? 'text-red-600' : 'text-blue-600'}`}>{title}</h3>
                         <p className="text-gray-700 mb-6 text-sm leading-relaxed whitespace-pre-line">{message}</p>
@@ -47,7 +47,7 @@ const { useState, useEffect, useMemo, useRef } = React;
         const CustomAlert = ({ isOpen, title = "Notice", message, onClose }) => {
             if (!isOpen) return null;
             return (
-                <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
+                <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[300] p-4 backdrop-blur-sm">
                     <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6">
                         <h3 className="text-lg font-bold mb-2 text-gray-800">{title}</h3>
                         <p className="text-gray-600 mb-6 text-sm">{message}</p>
@@ -1177,14 +1177,14 @@ const { useState, useEffect, useMemo, useRef } = React;
                                         </div>
                                     </div>
 
-                                    <div className="relative z-[120] mb-3">
+                                    <div className="relative z-[80] mb-3">
                                         <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-2 bg-blue-50 p-2 rounded border border-blue-100">
                                             <select className="p-2 border rounded text-xs w-full outline-none" value={searchClass} onChange={e => setSearchClass(e.target.value)}><option value="">Class</option>{CLASSES.map(c => <option key={c} value={c}>{c}</option>)}</select>
                                             <input type="text" placeholder="Search to add..." className="p-2 border rounded text-xs w-full outline-none" value={searchName} onChange={e => setSearchName(e.target.value)} />
                                         </div>
 
                                         {searchName && searchClass && (
-                                            <div className="absolute left-0 right-0 top-full mt-1 z-[130] border border-green-300 rounded max-h-56 overflow-y-auto bg-white shadow-2xl ring-2 ring-green-100">
+                                            <div className="absolute left-0 right-0 top-full mt-1 z-[90] border border-green-300 rounded max-h-56 overflow-y-auto bg-white shadow-2xl ring-2 ring-green-100">
                                                 {searchResults.length === 0 ? <div className="p-2 text-xs text-gray-500 text-center bg-green-50">No unlinked matches found.</div> :
                                                     searchResults.map(s => (
                                                         <div key={s.id} className="flex justify-between items-center gap-2 p-2 border-b bg-green-50 hover:bg-green-100">
