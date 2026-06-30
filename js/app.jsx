@@ -647,7 +647,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                 image.onerror = reject;
                 image.src = src;
             });
-            const wrapPdfText = (value, maxChars = 20) => {
+            const wrapPdfText = (value, maxChars = 27) => {
                 const text = String(value || '-').trim();
                 if (text.length <= maxChars) return text;
                 const words = text.split(/\s+/);
@@ -678,7 +678,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                     const groupMembers = student.displayMembers || getGroupMembers(student.groupId);
                     const groupFee = student.groupFee || (groupMembers.length * settings.globalBaseFee);
                     const classText = groupMembers.map(member => member.studentClass).join('\n');
-                    const nameText = groupMembers.map((member, memberIdx) => wrapPdfText(`${groupMembers.length > 1 ? `${memberIdx + 1}. ` : ''}${member.name || ''}${member.gender ? ` (${member.gender})` : ''}`, 20)).join('\n');
+                    const nameText = groupMembers.map((member, memberIdx) => wrapPdfText(`${groupMembers.length > 1 ? `${memberIdx + 1}. ` : ''}${member.name || ''}${member.gender ? ` (${member.gender})` : ''}`, 27)).join('\n');
                     const appExtraFees = settings.extraFees?.filter(f => feeAppliesToStudent(f, student.studentClass)) || [];
                     const totalExFee = appExtraFees.reduce((sum, f) => sum + feeAmountForStudent(f, student.studentClass), 0);
                     const paidExFee = Object.values(student.extraFeePayments || {}).reduce((sum, p) => sum + parseInt(p.amount || 0), 0);
@@ -690,7 +690,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                         const balance = payment.balance ?? payment.arrearsAdded ?? 0;
                         return [payment.receipt || String(payment.amount || 0), balance > 0 ? `Bal: ${balance}` : ''].filter(Boolean).join('\n');
                     });
-                    return { idx: idx + 1, classText, nameText, guardian: wrapPdfText(student.guardian || '-', 20), phone: student.phone || '-', groupFee, totalExFee, dueExFee, arrears, monthValues };
+                    return { idx: idx + 1, classText, nameText, guardian: wrapPdfText(student.guardian || '-', 27), phone: student.phone || '-', groupFee, totalExFee, dueExFee, arrears, monthValues };
                 });
                 const includeExtraTotal = preparedRows.some(row => row.totalExFee > 0);
                 const includeExtraBalance = preparedRows.some(row => row.dueExFee > 0);
@@ -721,7 +721,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                     }
                 }
                 const firstMonthColumn = columns.length - dynamicMonths.length;
-                const pdfColumnStyles = { 0: { cellWidth: 24, halign: 'center' }, 1: { cellWidth: 34, halign: 'center' }, 2: { cellWidth: 92 }, 3: { cellWidth: 82 }, 4: { cellWidth: 50, halign: 'center' }, 5: { cellWidth: 38, halign: 'center' } };
+                const pdfColumnStyles = { 0: { cellWidth: 24, halign: 'center' }, 1: { cellWidth: 34, halign: 'center' }, 2: { cellWidth: 110 }, 3: { cellWidth: 110 }, 4: { cellWidth: 50, halign: 'center' }, 5: { cellWidth: 38, halign: 'center' } };
                 columns.forEach((_, columnIndex) => {
                     if (columnIndex >= firstMonthColumn) pdfColumnStyles[columnIndex] = { cellWidth: 30, halign: 'center' };
                 });
