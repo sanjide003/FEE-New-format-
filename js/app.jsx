@@ -549,7 +549,30 @@ const { useState, useEffect, useMemo, useRef } = React;
             };
 
             const valueFromRow = (row, aliases) => aliases.map(alias => row[alias]).find(value => value !== undefined && value !== null && String(value).trim() !== '') || '';
-            const normalizePhoneText = (value) => String(value || '').replace(/\.0$/, '').trim();
+            const numberToPlainText = (value) => Number(value).toLocaleString('fullwide', { useGrouping: false, maximumFractionDigits: 0 });
+            const normalizeIdentifierText = (value) => {
+                if (value === undefined || value === null || value === '') return '';
+                if (typeof value === 'number' && Number.isFinite(value)) return numberToPlainText(value);
+                const text = String(value).trim();
+                if (/^[+-]?\d+(\.\d+)?e[+-]?\d+$/i.test(text)) {
+                    const numeric = Number(text);
+                    if (Number.isFinite(numeric)) return numberToPlainText(numeric);
+                }
+                return text.replace(/\.0$/, '').replace(/\s+/g, '');
+            };
+            const normalizeDateText = (value) => {
+                if (value === undefined || value === null || value === '') return '';
+                if (typeof value === 'number' && Number.isFinite(value) && value > 20000 && value < 80000) {
+                    const date = new Date(Math.round((value - 25569) * 86400 * 1000));
+                    if (!Number.isNaN(date.getTime())) {
+                        const dd = String(date.getUTCDate()).padStart(2, '0');
+                        const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
+                        const yyyy = date.getUTCFullYear();
+                        return `${dd}/${mm}/${yyyy}`;
+                    }
+                }
+                return String(value || '').replace(/\.0$/, '').trim();
+            };
             const normalizeImportRows = (rows) => {
                 const aliases = {
                     name: ['Name', 'Student Name', 'Full Name'], guardian: ['Father', 'Guardian'], phone: ['Mobile', 'Phone'], gender: ['Gender'],
@@ -559,7 +582,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                 const fileAdmNos = new Set();
                 return rows.map((row, idx) => {
                     const rawName = valueFromRow(row, aliases.name);
-                    const admNo = normalizePhoneText(valueFromRow(row, aliases.admNo));
+                    const admNo = normalizeIdentifierText(valueFromRow(row, aliases.admNo));
                     const duplicate = admNo && (existingAdmNos.has(admNo) || fileAdmNos.has(admNo));
                     if (admNo) fileAdmNos.add(admNo);
                     const status = !rawName ? 'Missing Name' : (duplicate ? 'Duplicate Adm No' : 'Ready');
@@ -568,13 +591,13 @@ const { useState, useEffect, useMemo, useRef } = React;
                         studentClass: selectedUploadClass,
                         gender: String(valueFromRow(row, aliases.gender) || '').trim().toUpperCase().startsWith('F') ? 'F' : 'M',
                         guardian: String(valueFromRow(row, aliases.guardian) || '').trim().toUpperCase(),
-                        phone: normalizePhoneText(valueFromRow(row, aliases.phone)),
+                        phone: normalizeIdentifierText(valueFromRow(row, aliases.phone)),
                         pendingArrears: 0, groupFee: null, payments: {}, extraFeePayments: {},
                         groupId: db.collection('students').doc().id,
                         profile: {
-                            dob: String(valueFromRow(row, aliases.dob) || '').trim(), address: String(valueFromRow(row, aliases.address) || '').trim(),
-                            adhaar: normalizePhoneText(valueFromRow(row, aliases.adhaar)), admNo,
-                            samasthaId: String(valueFromRow(row, aliases.samasthaId) || '').trim(), admDate: String(valueFromRow(row, aliases.admDate) || '').trim()
+                            dob: normalizeDateText(valueFromRow(row, aliases.dob)), address: String(valueFromRow(row, aliases.address) || '').trim(),
+                            adhaar: normalizeIdentifierText(valueFromRow(row, aliases.adhaar)), admNo,
+                            samasthaId: normalizeIdentifierText(valueFromRow(row, aliases.samasthaId)), admDate: normalizeDateText(valueFromRow(row, aliases.admDate))
                         }
                     };
                     return { rowNo: idx + 1, status, valid: status === 'Ready', studentData };
@@ -612,7 +635,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                         try {
                             const workbook = window.XLSX.read(event.target.result, { type: 'array', cellDates: false });
                             const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                            const rows = window.XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
+                            const rows = window.XLSX.utils.sheet_to_json(sheet, { defval: '', raw: true });
                             openImportPreview(rows, file.name);
                         } catch (err) {
                             setUploading(false); showAlert('Error reading Excel file. Please check the format.', 'Upload Error');
